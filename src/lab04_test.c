@@ -10,74 +10,123 @@
 
 #define PORT 6000
 #define NUM_OF_CLIENTS 2
+#define ARRAY_SIZE 5
 
 // int running = 1;
 
-// Handle client connection
-void handleClient(int clientSocket)
+void mult_array(const float *inputArray, float *outputArray, int size)
 {
-
-    while (1)
+    for (int i = 0; i < size; i++)
     {
-        const char *welcomeMsg = "Welcome to the server!";
-        send(clientSocket, welcomeMsg, strlen(welcomeMsg), 0);
+        outputArray[i] = inputArray[i] * 2.0; // Multiply each element by 2
+    }
+}
+
+// Handle client connection
+// Receive Client Messages, in this case, the array from client (MASTER)
+void handle_client(int client_socket)
+{
+    int loop = 5;
+    while (loop)
+    {
+        // const char *welcomeMsg = "Welcome to the server!";
+        // send(client_socket, welcomeMsg, strlen(welcomeMsg), 0);
+
+        // float array_send[ARRAY_SIZE] = {1.0, 69.69, 420.69, 1337.222, 777};
+
+        // printf("Enter %d float numbers:\n", ARRAY_SIZE);
+        // for (int i = 0; i < ARRAY_SIZE; i++)
+        // {
+        //     printf("Enter number %d: ", i + 1);
+        //     scanf("%f", &array[i]);
+        // }
+
 
         // Read client message
-        char buffer[1024] = {0};
-        int valread;
-        valread = read(clientSocket, buffer, 1024);
-        if (valread <= 0)
-        {
-            // Error or connection closed by client
-            // running = 0;
-            break;
-        }
+        // char buffer[1024] = {0};
+        // int valread;
+        // valread = read(client_socket, buffer, 1024);
+        // if (valread <= 0)
+        // {
+        //     // Error or connection closed by client
+        //     // running = 0;
+        //     break;
+        // }
 
-        printf("Received message: %s\n", buffer);
+        // printf("Received message: %s\n", buffer);
 
-        // Check for termination message
-        if (strcmp(buffer, "quit") == 0)
+        // // Check for termination message
+        // if (strcmp(buffer, "quit") == 0)
+        // {
+        //     printf("Termination message received. Closing connection.\n");
+        //     // running = 0;
+        //     break;
+        // }
+
+        float array_recv[ARRAY_SIZE];
+        float array_send[ARRAY_SIZE];
+        // Read the array
+        int bytesReceived = read(client_socket, array_recv, sizeof(array_recv));
+        // Calculate the number of elements in the received array
+        int numElements = bytesReceived / sizeof(float);
+
+        // Print the received array
+        printf("Received array: ");
+        for (int i = 0; i < numElements; i++)
         {
-            printf("Termination message received. Closing connection.\n");
-            // running = 0;
-            break;
+            printf("%.2f ", array_recv[i]);
         }
+        printf("\n");
+
+        mult_array(array_recv, array_send, ARRAY_SIZE);
+
+        printf("Sent modified array: ");
+        for (int i = 0; i < ARRAY_SIZE; i++)
+        {
+            printf("%.2f ", array_send[i]);
+        }
+        printf("\n");
+
+        send(client_socket, array_send, sizeof(array_send), 0);
+        // printf("Array sent\n");
 
         // Clear the buffer
-        memset(buffer, 0, sizeof(buffer));
+        memset(array_recv, 0, sizeof(array_recv));
+        memset(array_send, 0, sizeof(array_send));
+        loop--;
     }
 
     // Close the client socket
-    close(clientSocket);
+    close(client_socket);
 }
 
-void *startServer(void *arg)
+void *start_server(void *arg)
 {
     int port = *(int *)arg;
-    int serverSocket, clientSocket;
-    struct sockaddr_in serverAddr, clientAddr;
-    socklen_t clientAddrLen;
+    int server_fd, client_socket;
+    struct sockaddr_in server_addr, client_addr;
+    socklen_t client_addr_len;
 
     // Create the server socket
-    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (serverSocket < 0)
+    server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_fd < 0)
     {
         perror("Error creating socket");
         exit(1);
     }
 
     // Bind the server socket to the specified port
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_addr.s_addr = INADDR_ANY;
-    serverAddr.sin_port = htons(port);
-    if (bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port = htons(port);
+    if (bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
     {
         perror("Error binding socket");
         exit(1);
     }
 
     // Listen for incoming connections
-    if (listen(serverSocket, 5) < 0)
+    if (listen(server_fd, 5) < 0)
     {
         perror("Error listening");
         exit(1);
@@ -88,27 +137,27 @@ void *startServer(void *arg)
     while (1)
     {
         // Accept a client connection
-        clientAddrLen = sizeof(clientAddr);
-        clientSocket = accept(serverSocket, (struct sockaddr *)&clientAddr, &clientAddrLen);
-        if (clientSocket < 0)
+        client_addr_len = sizeof(client_addr);
+        client_socket = accept(server_fd, (struct sockaddr *)&client_addr, &client_addr_len);
+        if (client_socket < 0)
         {
             perror("Error accepting connection");
             exit(1);
         }
         printf("Client connected on port %d\n", port);
         // Handle the client connection in a separate function or thread
-        handleClient(clientSocket);
+        handle_client(client_socket);
     }
 
     printf("Server listening on port %d has been closed.\n", port);
 
     // Close the server socket
-    close(serverSocket);
+    close(server_fd);
 
     return NULL;
 }
 
-void connectToServer(int port)
+void conn_to_server(int port)
 {
     int status, valread, client_fd;
     struct sockaddr_in serv_addr;
@@ -143,22 +192,39 @@ void connectToServer(int port)
     while (1)
     {
         // Send the message to the server
-        char message[1024];
-        printf("Enter message: ");
-        fgets(message, sizeof(message), stdin);
-        // Remove newline character from the message
-        message[strcspn(message, "\n")] = '\0';
+        float array_send[ARRAY_SIZE] = {1.0, 69.69, 420.69, 1337.222, 777};
 
-        send(client_fd, message, strlen(message), 0);
-        printf("Message sent from PORT %d: %s\n", port, message);
+        printf("Sent float array: ");
+        for (int i = 0; i < ARRAY_SIZE; i++)
+        {
+            printf("%.2f ", array_send[i]);
+        }
+        printf("\n");
 
-        // Check if the message is "quit"
-        if (strcmp(message, "quit") == 0)
-            break;
+        send(client_fd, array_send, sizeof(array_send), 0);
+        // printf("Array sent\n");
+
+        float array_recv[ARRAY_SIZE];
+        // Read the array
+        int bytesReceived = read(client_fd, array_recv, sizeof(array_recv));
+        // Calculate the number of elements in the received array
+        int numElements = bytesReceived / sizeof(float);
+
+        // Print the received array
+        printf("Received array: ");
+        for (int i = 0; i < numElements; i++)
+        {
+            printf("%.2f ", array_recv[i]);
+        }
+        printf("\n");
+
+        // // Clear the buffer
+        memset(array_send, 0, sizeof(array_send));
+        memset(array_recv, 0, sizeof(array_recv));
 
         // Receive and print the server's response
-        valread = read(client_fd, buffer, 1024);
-        printf("Server response: %s\n", buffer);
+        // valread = read(client_fd, buffer, 1024);
+        // printf("Server response: %s\n", buffer);
     }
 
     // Close the connected socket
@@ -171,8 +237,6 @@ int main()
     printf("Choose mode:\n");
     printf("1. Server\n");
     printf("2. Client\n");
-    printf("3. Local\n");
-
     printf("Enter your choice: ");
     scanf("%d", &choice);
 
@@ -189,7 +253,7 @@ int main()
         {
             ports[i] = PORT + i;
 
-            if (pthread_create(&threads[i], NULL, startServer, (void *)&ports[i]) != 0)
+            if (pthread_create(&threads[i], NULL, start_server, (void *)&ports[i]) != 0)
             {
                 perror("Error creating thread");
                 exit(1);
@@ -208,13 +272,9 @@ int main()
         int port;
         printf("Enter PORT: ");
         scanf("%d", &port);
-        connectToServer(port);
+        conn_to_server(port);
 
         printf("Client mode ending.\n");
-    }
-    else if (choice == 3)
-    {
-        
     }
     else
     {

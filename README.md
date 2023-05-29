@@ -45,3 +45,5 @@ An implementation of multithreading in C by interpolating points in an n x n mat
 - https://www.sciencedirect.com/science/article/pii/S0167819198000210
 - https://www.geeksforgeeks.org/socket-programming-cc/
 - https://github.com/msgpack/msgpack-c?fbclid=IwAR1utxKobjojklDVCClH-VxNtlTsqoW4K2vYa1OHGGkPF1YbdCtJKdXD3vc
+- https://www.researchgate.net/post/How-to-install-msgpack-for-gcc-in-Ubuntu
+- https://www.geeksforgeeks.org/tcp-server-client-implementation-in-c/

@@ -2,9 +2,10 @@
 // Author: Aron Resty Ramillano | 2020-01721
 // Section: T3L
 
-// #define _GNU_SOURCE
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/time.h>
 #include <math.h>
 #include <pthread.h>
@@ -58,7 +59,7 @@ void destroyMatx(float **matx, int n)
 
     // New Implementation
     // Free mem of each row
-    for (int i = 0; i<n; ++i)
+    for (int i = 0; i < n; ++i)
     {
         free(matx[i]);
     }
@@ -94,7 +95,7 @@ int getMax(int n)
  */
 void printMatx(float **matx, int n)
 {
-    printf("\nPrint the %d x %d Matrix:\n", n-1, n-1);
+    printf("\nPrint the %d x %d Matrix:\n", n - 1, n - 1);
     for (int i = 0; i < n; i++)
     {
         for (int j = 0; j < n; j++)
@@ -277,7 +278,7 @@ void benchmark_input()
     }
 
     printf("\nCalculating a %d x %d matrix\nBenchmark will run 3x\nSleep for %d seconds each run\n", n, n, sleep_sec);
-    
+
     for (int i = 0; i < 3; i++)
     {
         printf("Run # %d\n", i + 1);
@@ -363,11 +364,74 @@ void user_input()
     destroyMatx(matx, n);
 }
 
+void packer_test()
+{
+    int n = 0;
+    printf("Enter n: ");
+    int check = scanf("%d", &n);
+    printf("n = %d\n", n);
+
+    // Initialize a buffer for packing and unpacking
+    size_t buffer_size = 1024;
+    char buffer[buffer_size];
+
+    // Create an integer to pack
+    // int n = 42;
+
+    // Pack the integer into the buffer
+    printf("Initiallizing packer and buffer...\n");
+    msgpack_sbuffer sbuffer;
+    msgpack_sbuffer_init(&sbuffer);
+    msgpack_packer packer;
+    msgpack_packer_init(&packer, &sbuffer, msgpack_sbuffer_write);
+
+    printf("Integer packed!\n");
+    msgpack_pack_int(&packer, n);
+
+
+    printf("Initiallizing unpacker...\n");
+    // Unpack the integer from the buffer
+    msgpack_unpacked unpacked;
+    msgpack_unpacked_init(&unpacked);
+
+    printf("Transferring unpacked data...\n");
+    memcpy(buffer, sbuffer.data, sbuffer.size);
+
+    printf("Unpacking the data...\n");
+    // Unpack the data from the buffer
+    msgpack_unpack_return result = msgpack_unpack_next(&unpacked, buffer, sbuffer.size, NULL);
+
+    // Check if the unpacking was successful
+    if (result == MSGPACK_UNPACK_SUCCESS)
+    {
+        // Check if the unpacked object is an integer
+        if (unpacked.data.type == MSGPACK_OBJECT_POSITIVE_INTEGER ||
+            unpacked.data.type == MSGPACK_OBJECT_NEGATIVE_INTEGER)
+        {
+            int unpackedValue = (int)unpacked.data.via.i64;
+            printf("Unpacked integer: %d\n", unpackedValue);
+        }
+        else
+        {
+            printf("Error: Unpacked object is not an integer\n");
+        }
+    }
+    else
+    {
+        printf("Error: Failed to unpack data\n");
+    }
+
+    printf("Cleaning up packers and buffers...\n");
+    // Clean up the resources
+    msgpack_sbuffer_destroy(&sbuffer);
+    msgpack_unpacked_destroy(&unpacked);
+}
+
 int main()
 {
     // Matrix size input
     int n = 0;
-    printf("Enter [1] for User Input\nEnter [2] for auto benchmark\n>>> ");
+    printf("Enter [1] for User Input\nEnter [2] for auto benchmark\nEnter [3] for data testing\n>>> ");
     int check = scanf("%d", &n);
 
     /*
@@ -376,15 +440,17 @@ int main()
     - if n <= 9
     - if n not divisible by 10
     */
-    while (!check || n > 2 || n < 1)
+    while (!check || n > 3 || n < 1)
     {
         printf("Wrong Input! Try again\n>>> ");
         check = scanf("%d", &n);
     }
     if (n == 1)
         user_input();
-    else
+    else if (n == 2)
         benchmark_input();
+    else
+        packer_test();
 
     return 0;
 }
