@@ -44,3 +44,4 @@ An implementation of multithreading in C by interpolating points in an n x n mat
 - https://man7.org/linux/man-pages/man3/CPU_SET.3.html
 - https://www.sciencedirect.com/science/article/pii/S0167819198000210
 - https://www.geeksforgeeks.org/socket-programming-cc/
+- https://github.com/msgpack/msgpack-c?fbclid=IwAR1utxKobjojklDVCClH-VxNtlTsqoW4K2vYa1OHGGkPF1YbdCtJKdXD3vc

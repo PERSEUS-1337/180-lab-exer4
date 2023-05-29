@@ -1,90 +1,142 @@
-#include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <pthread.h>
+#include <sys/time.h>
+#include <math.h>
+#include <time.h>
+#include <errno.h>
+#include <sched.h>
 
-#define NUM_PORTS 2
-#define PORT1 8080
-#define PORT2 8081
+#define PORT 5000
 
-int main(int argc, char const *argv[])
+int running = 1;
+
+void handleClient(int clientSocket)
 {
-    int server_fd[NUM_PORTS];
-    struct sockaddr_in address;
-    int opt = 1;
-    int addrlen = sizeof(address);
+    // Handle client connection
+    // You can implement your own logic here
+    // For demonstration purposes, we'll just send a welcome message
 
-    // Create and bind sockets for multiple ports
-    for (int i = 0; i < NUM_PORTS; i++)
+    while (running)
     {
-        // Create socket file descriptor
-        if ((server_fd[i] = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+        const char *welcomeMsg = "Welcome to the server!";
+        send(clientSocket, welcomeMsg, strlen(welcomeMsg), 0);
+
+        char buffer[1024] = {0};
+        int valread;
+        // Read client message
+        valread = read(clientSocket, buffer, 1024);
+        if (valread <= 0)
         {
-            perror("socket failed");
-            exit(EXIT_FAILURE);
+            // Error or connection closed by client
+            running = 0;
+            break;
         }
 
-        // Set socket options and bind
-        if (setsockopt(server_fd[i], SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)))
+        printf("Received message: %s\n", buffer);
+
+        // Check for termination message
+        if (strcmp(buffer, "quit") == 0)
         {
-            perror("setsockopt");
-            exit(EXIT_FAILURE);
+            printf("Termination message received. Closing connection.\n");
+            running = 0;
+            break;
         }
 
-        address.sin_family = AF_INET;
-        address.sin_addr.s_addr = INADDR_ANY;
-
-        // Bind to different ports based on the iteration
-        if (i == 0)
-        {
-            address.sin_port = htons(PORT1);
-        }
-        else if (i == 1)
-        {
-            address.sin_port = htons(PORT2);
-        }
-
-        // Bind the socket to the port
-        if (bind(server_fd[i], (struct sockaddr *)&address, sizeof(address)) < 0)
-        {
-            perror("bind failed");
-            exit(EXIT_FAILURE);
-        }
-
-        // Listen for incoming connections
-        if (listen(server_fd[i], 3) < 0)
-        {
-            perror("listen");
-            exit(EXIT_FAILURE);
-        }
+        // Clear the buffer
+        memset(buffer, 0, sizeof(buffer));
     }
 
-    // Accept and handle incoming connections for each port
-    while (1)
+    // Close the client socket
+    close(clientSocket);
+}
+
+void *startServer(void *arg)
+{
+    int port = *(int *)arg;
+    int serverSocket, clientSocket;
+    struct sockaddr_in serverAddr, clientAddr;
+    socklen_t clientAddrLen;
+
+    // Create the server socket
+    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (serverSocket < 0)
     {
-        for (int i = 0; i < NUM_PORTS; i++)
+        perror("Error creating socket");
+        exit(1);
+    }
+
+    // Bind the server socket to the specified port
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
+    serverAddr.sin_port = htons(port);
+    if (bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
+    {
+        perror("Error binding socket");
+        exit(1);
+    }
+
+    // Listen for incoming connections
+    if (listen(serverSocket, 5) < 0)
+    {
+        perror("Error listening");
+        exit(1);
+    }
+
+    printf("Server listening on port %d\n", port);
+
+    while (running)
+    {
+        // Accept a client connection
+        clientAddrLen = sizeof(clientAddr);
+        clientSocket = accept(serverSocket, (struct sockaddr *)&clientAddr, &clientAddrLen);
+        if (clientSocket < 0)
         {
-            int new_socket;
-            if ((new_socket = accept(server_fd[i], (struct sockaddr *)&address, (socklen_t *)&addrlen)) < 0)
-            {
-                perror("accept");
-                exit(EXIT_FAILURE);
-            }
-
-            // Handle the connection for this port
-
-            // Close the connected socket
-            close(new_socket);
+            perror("Error accepting connection");
+            exit(1);
         }
+        printf("Client connected on port %d\n", port);
+        // Handle the client connection in a separate function or thread
+        handleClient(clientSocket);
     }
 
-    // Close listening sockets
-    for (int i = 0; i < NUM_PORTS; i++)
+    printf("Server listening on port %d has been closed.\n", port);
+
+    // Close the server socket
+    close(serverSocket);
+
+    return NULL;
+}
+
+int main()
+{
+    // Create threads for each server
+    pthread_t thread1, thread2;
+    int port1 = PORT;
+    int port2 = PORT + 1;
+
+    if (pthread_create(&thread1, NULL, startServer, (void *)&port1) != 0)
     {
-        close(server_fd[i]);
+        perror("Error creating thread for port #1");
+        exit(1);
     }
+
+    if (pthread_create(&thread2, NULL, startServer, (void *)&port2) != 0)
+    {
+        perror("Error creating thread for port #2");
+        exit(1);
+    }
+
+    // Wait for the threads to finish
+    pthread_join(thread1, NULL);
+    pthread_join(thread2, NULL);
+
+    printf("Program ending.\n");
 
     return 0;
 }

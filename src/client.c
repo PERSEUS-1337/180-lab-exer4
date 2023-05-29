@@ -9,9 +9,9 @@
 
 int main(int argc, char const* argv[])
 {
-    int port;
-    printf("Enter PORT: ");
-    int check = scanf("%d", &port);
+    int port = PORT;
+    // printf("Enter PORT: ");
+    // int check = scanf("%d", &port);
 
     // Create a buffer to hold the formatted string
     char hello[50];
