@@ -357,7 +357,7 @@ void user_input()
     double elapsed_time = (double)micros / 1000000.0;
 
     // Clean matrix print
-    // printMatx(matx, n);
+    printMatx(matx, n);
 
     printf("\nElapsed time: %.5f seconds\n", elapsed_time);
 

@@ -47,3 +47,4 @@ An implementation of multithreading in C by interpolating points in an n x n mat
 - https://github.com/msgpack/msgpack-c?fbclid=IwAR1utxKobjojklDVCClH-VxNtlTsqoW4K2vYa1OHGGkPF1YbdCtJKdXD3vc
 - https://www.researchgate.net/post/How-to-install-msgpack-for-gcc-in-Ubuntu
 - https://www.geeksforgeeks.org/tcp-server-client-implementation-in-c/
+- https://askubuntu.com/questions/641683/how-can-i-send-commands-to-specific-terminal-windows
