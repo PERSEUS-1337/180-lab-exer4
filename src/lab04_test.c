@@ -27,8 +27,6 @@ typedef struct
     int start;
     int end;
     int port;
-    // float *top;
-    // float *bot;
     int chunk;
 } MasterArgs;
 
@@ -123,41 +121,22 @@ void handle_client(int client_socket)
     printf("\nReceived n: %d\n", recv_n);
     printf("\nReceived size: %d\n", recv_chunk);
 
-    // float result[recv_chunk][recv_n];
-    float **result = createMatx(recv_chunk, recv_n);
+    // float **result = createMatx(recv_chunk, recv_n);
     int count = 0;
     while (count < recv_chunk)
     {
-        float array_recv[recv_n];
-
+        float recv_float;
         // Read the array
-        int bytesReceived = read(client_socket, array_recv, sizeof(array_recv));
+        int bytesReceived = read(client_socket, &recv_float, sizeof(float));
         if (bytesReceived <= 0)
         {
             // Error or connection closed by client
             break;
         }
-        // Calculate the number of elements in the received array
-        int numElements = bytesReceived / sizeof(float);
-
-        // Print the received array
-        // printf("Received array: ");
-        // for (int i = 0; i < numElements; i++)
-        // {
-        //     // result[i] = array_recv[i];
-        //     printf("%.2f ", array_recv[i]);
-        // }
-
-        for (int j = 0; j < recv_n; j++)
-        {
-            result[count][j] = array_recv[j];
-        }
-        // printf("\n");
-
-        printMatx(result, recv_chunk, recv_n);
+        printf("%f\n", recv_float);
 
         // Clear the buffer
-        memset(array_recv, 0, sizeof(array_recv));
+        memset(&recv_float, 0, sizeof(recv_float));
         count++;
     }
 
@@ -263,7 +242,8 @@ void *conn_to_server(void *arg)
 
     for (int i = args->start; i < args->end; i++)
     {
-        send(client_fd, args->M[i], args->n * sizeof(float), 0);
+        for (int j = 0; j < args->n; j++)
+            send(client_fd, &args->M[i][j], sizeof(float), 0);
     }
     printf("\nMatrix sent!\n");
 
