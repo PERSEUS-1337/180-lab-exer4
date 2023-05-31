@@ -26,8 +26,11 @@ typedef struct
     int n;
     int start;
     int end;
-    int core_id;
-} ThreadArgs;
+    int port;
+    // float *top;
+    // float *bot;
+    int chunk;
+} MasterArgs;
 
 void mult_array(const float *inputArray, float *outputArray, int size)
 {
@@ -37,14 +40,26 @@ void mult_array(const float *inputArray, float *outputArray, int size)
     }
 }
 
-float **createMatx(int n)
+// float **createMatx(int n)
+// {
+//     float **rows = malloc(n * sizeof(float *));
+
+//     for (int i = 0; i < n; i++)
+//         rows[i] = malloc(sizeof(float) * n);
+
+//     return rows;
+// }
+
+float **createMatx(int rows, int cols)
 {
-    float **rows = malloc(n * sizeof(float *));
+    float **matrix = malloc(rows * sizeof(float *));
 
-    for (int i = 0; i < n; i++)
-        rows[i] = malloc(sizeof(float) * n);
+    for (int i = 0; i < rows; i++)
+    {
+        matrix[i] = malloc(cols * sizeof(float));
+    }
 
-    return rows;
+    return matrix;
 }
 
 void destroyMatx(float **matx, int n)
@@ -65,12 +80,12 @@ void populateMatx(float **matx, int n)
                 matx[i][j] = (rand() % (1000));
 }
 
-void printMatx(float **matx, int n)
+void printMatx(float **matx, int rows, int cols)
 {
-    printf("\nPrint the %d x %d Matrix:\n", n - 1, n - 1);
-    for (int i = 0; i < n; i++)
+    printf("\nPrint the %d x %d (+1) Matrix:\n", cols - 1, rows - 1);
+    for (int i = 0; i < rows; i++)
     {
-        for (int j = 0; j < n; j++)
+        for (int j = 0; j < cols; j++)
         {
             printf("%.3f ", matx[i][j]);
         }
@@ -78,14 +93,42 @@ void printMatx(float **matx, int n)
     }
 }
 
-// Handle client connection
-// Receive Client Messages, in this case, the array from client (MASTER)
+int getMin(int n)
+{
+    int min = 0;
+
+    if (n > 1)
+        min = floor((n - 1) / 10) * 10;
+
+    return min;
+}
+
+int getMax(int n)
+{
+    int max = 10;
+
+    if (n > 0)
+        max = ceil(n / 10.0) * 10;
+
+    return max;
+}
+
+// SLAVE: Receive MASTER messages
 void handle_client(int client_socket)
 {
-    while (1)
+    int recv_n;
+    int recv_chunk;
+    int bytesReceived1 = read(client_socket, &recv_n, sizeof(int));
+    int bytesReceived2 = read(client_socket, &recv_chunk, sizeof(int));
+    printf("\nReceived n: %d\n", recv_n);
+    printf("\nReceived size: %d\n", recv_chunk);
+
+    // float result[recv_chunk][recv_n];
+    float **result = createMatx(recv_chunk, recv_n);
+    int count = 0;
+    while (count < recv_chunk)
     {
-        float array_recv[11];
-        // float array_send[ARRAY_SIZE];
+        float array_recv[recv_n];
 
         // Read the array
         int bytesReceived = read(client_socket, array_recv, sizeof(array_recv));
@@ -98,35 +141,31 @@ void handle_client(int client_socket)
         int numElements = bytesReceived / sizeof(float);
 
         // Print the received array
-        printf("Received array: ");
-        for (int i = 0; i < numElements; i++)
-        {
-            printf("%.2f ", array_recv[i]);
-        }
-        printf("\n");
-
-        // mult_array(array_recv, array_send, ARRAY_SIZE);
-
-        // printf("Sent modified array: ");
-        // for (int i = 0; i < ARRAY_SIZE; i++)
+        // printf("Received array: ");
+        // for (int i = 0; i < numElements; i++)
         // {
-        //     printf("%.2f ", array_send[i]);
+        //     // result[i] = array_recv[i];
+        //     printf("%.2f ", array_recv[i]);
         // }
+
+        for (int j = 0; j < recv_n; j++)
+        {
+            result[count][j] = array_recv[j];
+        }
         // printf("\n");
 
-        // send(client_socket, array_send, sizeof(array_send), 0);
-        // printf("Array sent\n");
+        printMatx(result, recv_chunk, recv_n);
 
         // Clear the buffer
         memset(array_recv, 0, sizeof(array_recv));
-        // memset(array_send, 0, sizeof(array_send));
+        count++;
     }
 
     // Close the client socket
     close(client_socket);
 }
 
-// void *start_server(void *arg)
+// SLAVE: Start listening on PORT
 void *start_server(int port)
 {
     // int port = *(int *)arg;
@@ -159,7 +198,7 @@ void *start_server(int port)
         exit(1);
     }
 
-    printf("Server listening on port %d\n", port);
+    printf("\nServer listening on port %d\n", port);
 
     while (1)
     {
@@ -171,12 +210,12 @@ void *start_server(int port)
             perror("Error accepting connection");
             exit(1);
         }
-        printf("Client connected on port %d\n", port);
+        printf("\nClient connected on port %d\n", port);
         // Handle the client connection in a separate function or thread
         handle_client(client_socket);
     }
 
-    printf("Server listening on port %d has been closed.\n", port);
+    printf("\nServer listening on port %d has been closed.\n", port);
 
     // Close the server socket
     close(server_fd);
@@ -184,9 +223,11 @@ void *start_server(int port)
     return NULL;
 }
 
+// MASTER: Connect to SLAVE PORTS
 void *conn_to_server(void *arg)
 {
-    int port = *(int *)arg;
+    MasterArgs *args = (MasterArgs *)arg;
+    int port = args->port;
     int status, valread, client_fd;
     struct sockaddr_in serv_addr;
     char buffer[1024] = {0};
@@ -217,100 +258,23 @@ void *conn_to_server(void *arg)
         return NULL;
     }
 
-    // while (1)
-    // {
-        // // Send the message to the server
-        // float array_send[ARRAY_SIZE] = {1.0, 69.69, 420.69, 1337.222, 777};
+    send(client_fd, &args->n, sizeof(int), 0);
+    send(client_fd, &args->chunk, sizeof(int), 0);
 
-        // printf("Sent float array: ");
-        // for (int i = 0; i < ARRAY_SIZE; i++)
-        // {
-        //     printf("%.2f ", array_send[i]);
-        // }
-        // printf("\n");
+    for (int i = args->start; i < args->end; i++)
+    {
+        send(client_fd, args->M[i], args->n * sizeof(float), 0);
+    }
+    printf("\nMatrix sent!\n");
 
-        // send(client_fd, array_send, sizeof(array_send), 0);
-        // // printf("Array sent\n");
+    // destroyMatx(matx, n);
 
-        // float array_recv[ARRAY_SIZE];
-        // // Read the array
-        // int bytesReceived = read(client_fd, array_recv, sizeof(array_recv));
-        // // Calculate the number of elements in the received array
-        // int numElements = bytesReceived / sizeof(float);
-
-        // // Print the received array
-        // printf("Received array: ");
-        // for (int i = 0; i < numElements; i++)
-        // {
-        //     printf("%.2f ", array_recv[i]);
-        // }
-        // printf("\n");
-
-        int n = 10;
-        // printf("Enter n divisible by 10: ");
-        // int check = scanf("%d", &n);
-
-        // while (!check || n <= 9 || n % 10 != 0)
-        // {
-        //     printf("Wrong Input! Try again: ");
-        //     check = scanf("%d", &n);
-        // }
-        n++;
-
-        float **matx = createMatx(n);
-        populateMatx(matx, n);
-
-        for (int i = 0; i < n; i++)
-        {
-            send(client_fd, matx[i], n * sizeof(float), 0);
-        }
-        printMatx(matx, n);
-        printf("Matrix sent!\n");
-
-        // destroyMatx(matx, n);
-        
-        // // Clear the buffer
-        memset(matx, 0, sizeof(matx));
-        // memset(array_recv, 0, sizeof(array_recv));
-    // }
+    // // Clear the buffer
+    // memset(matx, 0, sizeof(matx));
+    // memset(array_recv, 0, sizeof(array_recv));
 
     // Close the connected socket
     close(client_fd);
-}
-
-void terrain_inter(float **M, int n, int num_threads, int port)
-{
-    pthread_t threads[num_threads];
-    ThreadArgs args[num_threads];
-
-    // This is basically the submatrices that we are going to make.
-    int chunk_size = n / num_threads;
-
-    for (int i = 0; i < num_threads; i++)
-    {
-        args[i].M = M;
-        args[i].n = n;
-        args[i].start = i * chunk_size;
-        args[i].end = (i + 1) * chunk_size;
-        args[i].core_id = (i % NUM_CORES);
-
-        // Because the matrix should include the 0th coordinate, we would have to adjust our calculation to have the last submatrix to be able to handle a second row.
-        if (num_threads > 1 && i == num_threads - 1)
-        {
-            args[i].end++;
-        }
-
-        // Actual implementation of creating a thread
-        // We pass the arguments stated above on where on the matrix they should start
-        // pthread_create(&threads[i], NULL, thread_func, &args[i]);
-        pthread_create(&threads[i], NULL, conn_to_server, &port);
-    }
-
-    // This will join the threads if they are finished in their operation, therefore finishing this terrain_inter function
-    for (int i = 0; i < num_threads; i++)
-    {
-        pthread_join(threads[i], NULL);
-    }
 }
 
 int main()
@@ -324,67 +288,79 @@ int main()
 
     if (choice == 1)
     {
-        // int numThreads;
-        // printf("Enter the number of threads to create: ");
-        // scanf("%d", &numThreads);
-
-        // pthread_t threads[numThreads];
-        // // int ports[numThreads];
         int port;
 
-        // for (int i = 0; i < numThreads; i++)
-        // {
-        //     // ports[i] = PORT + i;
-            // printf("Enter your port: ");
-            // scanf("%d", &port);
         printf("Enter your port: ");
         scanf("%d", &port);
         start_server(port);
-
-        //     if (pthread_create(&threads[i], NULL, start_server, (void *)&port) != 0)
-        //     {
-        //         perror("Error creating thread");
-        //         exit(1);
-        //     }
-        // }
-
-        // for (int i = 0; i < numThreads; i++)
-        // {
-        //     pthread_join(threads[i], NULL);
-        // }
 
         printf("Slave mode ending.\n");
     }
     else if (choice == 2)
     {
         int port;
+        int num_slaves;
+        int n = 0;
+        srand(time(NULL));
+
         printf("Enter PORT: ");
         scanf("%d", &port);
 
-        int num_slaves;
         printf("Enter the number of slaves to connect to: ");
         scanf("%d", &num_slaves);
 
-        pthread_t threads[num_slaves];
+        printf("Enter n: ");
+        int check = scanf("%d", &n);
+        while (!check || n <= 9 || n % 10 != 0)
+        {
+            printf("Wrong Input! Try again: ");
+            check = scanf("%d", &n);
+        }
 
-        int n = 10;
-        n++
-        float **matx = createMatx(n);
+        // To compensate for extra 0-th coordinate
+        n++;
+
+        pthread_t threads[num_slaves];
+        MasterArgs args[num_slaves];
+
+        float **matx = createMatx(n, n);
         populateMatx(matx, n);
+
+        // printMatx(matx, n, n);
+
+        int chunk_size = (n - 1) / num_slaves;
 
         for (int i = 0; i < num_slaves; i++)
         {
-            port+=i;
-            terrain_inter(matx, n, num_slaves, port);
-            // pthread_create(&threads[i], NULL, conn_to_server, &port);
+            printf("\nPort: %d\n", port);
+            int min = getMin(i);
+            int max = getMax(i);
+
+            args[i].M = matx;
+            args[i].n = n;
+
+            if (i == 0)
+                args[i].start = 0;
+            else
+                args[i].start = getMin((i)*chunk_size);
+
+            args[i].end = getMax((i + 1) * chunk_size) + 1;
+            args[i].port = port;
+            args[i].chunk = args[i].end - args[i].start;
+
+            printf("Start: %d, End: %d\n", args[i].start, args[i].end);
+
+            pthread_create(&threads[i], NULL, conn_to_server, &args[i]);
+
+            printf("Port Sent:%d\n", port);
+
+            port++;
         }
-            // port++;
-            // conn_to_server(port + i);
 
         for (int i = 0; i < num_slaves; i++)
             pthread_join(threads[i], NULL);
 
-        printf("Master mode ending.\n");
+        printf("\nMaster mode ending.\n");
     }
     else
     {

@@ -1,4 +1,6 @@
 #!/bin/bash
-gcc -o a lab03.c -lm -pthread;
-./a;
+clear;
+gcc lab04_test.c -o ./exe/test -lm -pthread;
+cd ./exe;
+./test;
 

@@ -364,69 +364,6 @@ void user_input()
     destroyMatx(matx, n);
 }
 
-void packer_test()
-{
-    int n = 0;
-    printf("Enter n: ");
-    int check = scanf("%d", &n);
-    printf("n = %d\n", n);
-
-    // Initialize a buffer for packing and unpacking
-    size_t buffer_size = 1024;
-    char buffer[buffer_size];
-
-    // Create an integer to pack
-    // int n = 42;
-
-    // Pack the integer into the buffer
-    printf("Initiallizing packer and buffer...\n");
-    msgpack_sbuffer sbuffer;
-    msgpack_sbuffer_init(&sbuffer);
-    msgpack_packer packer;
-    msgpack_packer_init(&packer, &sbuffer, msgpack_sbuffer_write);
-
-    printf("Integer packed!\n");
-    msgpack_pack_int(&packer, n);
-
-
-    printf("Initiallizing unpacker...\n");
-    // Unpack the integer from the buffer
-    msgpack_unpacked unpacked;
-    msgpack_unpacked_init(&unpacked);
-
-    printf("Transferring unpacked data...\n");
-    memcpy(buffer, sbuffer.data, sbuffer.size);
-
-    printf("Unpacking the data...\n");
-    // Unpack the data from the buffer
-    msgpack_unpack_return result = msgpack_unpack_next(&unpacked, buffer, sbuffer.size, NULL);
-
-    // Check if the unpacking was successful
-    if (result == MSGPACK_UNPACK_SUCCESS)
-    {
-        // Check if the unpacked object is an integer
-        if (unpacked.data.type == MSGPACK_OBJECT_POSITIVE_INTEGER ||
-            unpacked.data.type == MSGPACK_OBJECT_NEGATIVE_INTEGER)
-        {
-            int unpackedValue = (int)unpacked.data.via.i64;
-            printf("Unpacked integer: %d\n", unpackedValue);
-        }
-        else
-        {
-            printf("Error: Unpacked object is not an integer\n");
-        }
-    }
-    else
-    {
-        printf("Error: Failed to unpack data\n");
-    }
-
-    printf("Cleaning up packers and buffers...\n");
-    // Clean up the resources
-    msgpack_sbuffer_destroy(&sbuffer);
-    msgpack_unpacked_destroy(&unpacked);
-}
-
 int main()
 {
     // Matrix size input
