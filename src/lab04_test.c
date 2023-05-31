@@ -93,6 +93,38 @@ int getMax(int n)
     return max;
 }
 
+void terrain_inter(float **matx, int row, int col)
+{
+    for (int i = 0; i < row; i++)
+    {
+        int min_x = getMin(i);
+        int max_x = getMax(i);
+        for (int j = 0; j < col; j++)
+        {
+            if (!((i % 10 == 0) && (j % 10 == 0)))
+            {
+                int min_y = getMin(j);
+                int max_y = getMax(j);
+
+                int area_d = (abs(min_x - i) * abs(min_y - j));
+                int area_c = (abs(max_x - i) * abs(min_y - j));
+                int area_b = (abs(min_x - i) * abs(max_y - j));
+                int area_a = (abs(max_x - i) * abs(max_y - j));
+
+                float elev_a = matx[min_x][min_y];
+                float elev_b = matx[max_x][min_y];
+                float elev_c = matx[min_x][max_y];
+                float elev_d = matx[max_x][max_y];
+
+                float elevation = ((area_a * elev_a) + (area_b * elev_b) + (area_c * elev_c) + (area_d * elev_d)) / (float)(area_a + area_b + area_c + area_d);
+
+                matx[i][j] = elevation;
+                // printf("Boundary: %i %i | Coords: %i %i | Val: %f\n", args->start, args->end, i, j, elevation);
+            }
+        }
+    }
+}
+
 // SLAVE: Receive MASTER messages
 void handle_client(int client_socket)
 {
@@ -107,43 +139,6 @@ void handle_client(int client_socket)
     int count = 0;
     recv_cols;
     recv_rows;
-    // while (count < (recv_rows * recv_cols))
-    // while (count < 130)
-    // {
-    //     printf("Count: %d\n", count);
-
-    //     float recv_float;
-    //     // Read the float
-    //     int bytesReceived = read(client_socket, &recv_float, sizeof(float));
-    //     // if (bytesReceived == sizeof(float))
-    //     // {
-    //     //     // Calculate the current position in the array
-    //     //     int row = count / recv_cols;
-    //     //     int col = count % recv_cols;
-
-    //     //     printf("Row: %d, Col: %d\n", row, col);
-    //     //     // Store the received element in the array
-    //     //     result[row][col] = recv_float;
-
-    //     //     // Increment the counter
-    //     //     count++;
-    //     // }
-    //     // else
-    //     // {
-    //     //     // Error handling for read failure
-    //     //     perror("Error receiving element");
-    //     //     break;
-    //     // }
-
-    //     // int row = count / recv_cols;
-    //     // int col = count % recv_cols;
-    //     // printf("Row: %d, Col: %d\n", row, col);
-    //     printf("Float: %f\n", recv_float);
-
-    //     // Clear the buffer
-    //     memset(&recv_float, 0, sizeof(recv_float));
-    //     count++;
-    // }
     for (int row = 0; row < recv_rows; row++)
     {
         for (int col = 0; col < recv_cols; col++)
@@ -158,8 +153,13 @@ void handle_client(int client_socket)
             memset(&recv_float, 0, sizeof(recv_float));
         }
     }
-    printf("Last Element: %f\n", result[recv_rows-1][recv_cols-1]);
-    // printMatx(result, recv_rows, recv_cols);
+    // printf("Last Element: %f\n", result[recv_rows - 1][recv_cols - 1]);
+    printf("\nReceived Matrix:\n");
+    printMatx(result, recv_rows, recv_cols);
+    terrain_inter(result, recv_rows, recv_cols);
+
+    printf("\nModified Matrix:\n");
+    printMatx(result, recv_rows, recv_cols);
 
     // Close the client socket
     close(client_socket);
@@ -327,8 +327,8 @@ int main()
         float **matx = createMatx(n, n);
         populateMatx(matx, n);
 
-        // printMatx(matx, n, n);
-        printf("\nLast Element: %f\n", matx[n-1][n-1]);
+        printMatx(matx, n, n);
+        printf("\nLast Element: %f\n", matx[n - 1][n - 1]);
 
         int chunk_size = (n - 1) / num_slaves;
 
@@ -344,7 +344,7 @@ int main()
             if (i == 0)
                 args[i].start = 0;
             else
-                args[i].start = getMin((i)*chunk_size);
+                args[i].start = getMin((i + 1) * chunk_size);
 
             args[i].end = getMax((i + 1) * chunk_size) + 1;
             args[i].port = port;
