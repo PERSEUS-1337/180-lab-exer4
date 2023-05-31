@@ -30,24 +30,6 @@ typedef struct
     int chunk;
 } MasterArgs;
 
-void mult_array(const float *inputArray, float *outputArray, int size)
-{
-    for (int i = 0; i < size; i++)
-    {
-        outputArray[i] = inputArray[i] * 2.0; // Multiply each element by 2
-    }
-}
-
-// float **createMatx(int n)
-// {
-//     float **rows = malloc(n * sizeof(float *));
-
-//     for (int i = 0; i < n; i++)
-//         rows[i] = malloc(sizeof(float) * n);
-
-//     return rows;
-// }
-
 float **createMatx(int rows, int cols)
 {
     float **matrix = malloc(rows * sizeof(float *));
@@ -114,31 +96,70 @@ int getMax(int n)
 // SLAVE: Receive MASTER messages
 void handle_client(int client_socket)
 {
-    int recv_n;
-    int recv_chunk;
-    int bytesReceived1 = read(client_socket, &recv_n, sizeof(int));
-    int bytesReceived2 = read(client_socket, &recv_chunk, sizeof(int));
-    printf("\nReceived n: %d\n", recv_n);
-    printf("\nReceived size: %d\n", recv_chunk);
+    int recv_cols;
+    int recv_rows;
+    int bytesReceived1 = read(client_socket, &recv_cols, sizeof(int));
+    int bytesReceived2 = read(client_socket, &recv_rows, sizeof(int));
+    printf("\nReceived n: %d\n", recv_cols);
+    printf("\nReceived size: %d\n", recv_rows);
 
-    // float **result = createMatx(recv_chunk, recv_n);
+    float **result = createMatx(recv_rows, recv_cols);
     int count = 0;
-    while (count < recv_chunk)
-    {
-        float recv_float;
-        // Read the array
-        int bytesReceived = read(client_socket, &recv_float, sizeof(float));
-        if (bytesReceived <= 0)
-        {
-            // Error or connection closed by client
-            break;
-        }
-        printf("%f\n", recv_float);
+    recv_cols;
+    recv_rows;
+    // while (count < (recv_rows * recv_cols))
+    // while (count < 130)
+    // {
+    //     printf("Count: %d\n", count);
 
-        // Clear the buffer
-        memset(&recv_float, 0, sizeof(recv_float));
-        count++;
+    //     float recv_float;
+    //     // Read the float
+    //     int bytesReceived = read(client_socket, &recv_float, sizeof(float));
+    //     // if (bytesReceived == sizeof(float))
+    //     // {
+    //     //     // Calculate the current position in the array
+    //     //     int row = count / recv_cols;
+    //     //     int col = count % recv_cols;
+
+    //     //     printf("Row: %d, Col: %d\n", row, col);
+    //     //     // Store the received element in the array
+    //     //     result[row][col] = recv_float;
+
+    //     //     // Increment the counter
+    //     //     count++;
+    //     // }
+    //     // else
+    //     // {
+    //     //     // Error handling for read failure
+    //     //     perror("Error receiving element");
+    //     //     break;
+    //     // }
+
+    //     // int row = count / recv_cols;
+    //     // int col = count % recv_cols;
+    //     // printf("Row: %d, Col: %d\n", row, col);
+    //     printf("Float: %f\n", recv_float);
+
+    //     // Clear the buffer
+    //     memset(&recv_float, 0, sizeof(recv_float));
+    //     count++;
+    // }
+    for (int row = 0; row < recv_rows; row++)
+    {
+        for (int col = 0; col < recv_cols; col++)
+        {
+            float recv_float;
+            // Read the float
+            int bytesReceived = read(client_socket, &recv_float, sizeof(float));
+            // printf("Float: %f\n", recv_float);
+
+            // printf("Row: %d, Col: %d\n", row, col);
+            result[row][col] = recv_float;
+            memset(&recv_float, 0, sizeof(recv_float));
+        }
     }
+    printf("Last Element: %f\n", result[recv_rows-1][recv_cols-1]);
+    // printMatx(result, recv_rows, recv_cols);
 
     // Close the client socket
     close(client_socket);
@@ -307,6 +328,7 @@ int main()
         populateMatx(matx, n);
 
         // printMatx(matx, n, n);
+        printf("\nLast Element: %f\n", matx[n-1][n-1]);
 
         int chunk_size = (n - 1) / num_slaves;
 
