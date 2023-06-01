@@ -14,11 +14,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sched.h>
-
-#define PORT 6000
-#define NUM_OF_CLIENTS 2
-#define ARRAY_SIZE 5
-#define NUM_CORES 12
+#include <stdbool.h>
 
 typedef struct
 {
@@ -132,13 +128,12 @@ void handle_client(int client_socket)
     int recv_rows;
     int bytesReceived1 = read(client_socket, &recv_cols, sizeof(int));
     int bytesReceived2 = read(client_socket, &recv_rows, sizeof(int));
-    printf("\nReceived n: %d\n", recv_cols);
-    printf("\nReceived size: %d\n", recv_rows);
 
-    float **result = createMatx(recv_rows, recv_cols);
+    printf("\nRow Length: %d\nCol Length:%d\n", recv_rows, recv_cols);
+
+        float **result = createMatx(recv_rows, recv_cols);
     int count = 0;
-    recv_cols;
-    recv_rows;
+    printf("\nReceiving Matrix...\n");
     for (int row = 0; row < recv_rows; row++)
     {
         for (int col = 0; col < recv_cols; col++)
@@ -153,13 +148,20 @@ void handle_client(int client_socket)
             memset(&recv_float, 0, sizeof(recv_float));
         }
     }
-    // printf("Last Element: %f\n", result[recv_rows - 1][recv_cols - 1]);
-    printf("\nReceived Matrix:\n");
-    printMatx(result, recv_rows, recv_cols);
+    printf("Matrix Received\n");
+    printf("Calculating...\n");
     terrain_inter(result, recv_rows, recv_cols);
+    printf("Matrix Calculated!\n");
 
-    printf("\nModified Matrix:\n");
-    printMatx(result, recv_rows, recv_cols);
+    // printMatx(result, recv_rows, recv_cols);
+
+    // Create a buffer to hold the formatted string
+    char hello[10];
+    // Format the string with the PORT value
+    sprintf(hello, "ahckkkkk!");
+    send(client_socket, hello, strlen(hello), 0);
+
+    printf("\nSent ack back to client!\n");
 
     // Close the client socket
     close(client_socket);
@@ -168,7 +170,6 @@ void handle_client(int client_socket)
 // SLAVE: Start listening on PORT
 void *start_server(int port)
 {
-    // int port = *(int *)arg;
     int server_fd, client_socket;
     struct sockaddr_in server_addr, client_addr;
     socklen_t client_addr_len;
@@ -198,7 +199,7 @@ void *start_server(int port)
         exit(1);
     }
 
-    printf("\nServer listening on port %d\n", port);
+    printf("\nSlave listening on port %d\n", port);
 
     while (1)
     {
@@ -210,12 +211,12 @@ void *start_server(int port)
             perror("Error accepting connection");
             exit(1);
         }
-        printf("\nClient connected on port %d\n", port);
+        printf("Master connected on port %d\n", port);
         // Handle the client connection in a separate function or thread
         handle_client(client_socket);
     }
 
-    printf("\nServer listening on port %d has been closed.\n", port);
+    printf("\nSlave listening on port %d has been closed.\n", port);
 
     // Close the server socket
     close(server_fd);
@@ -230,7 +231,6 @@ void *conn_to_server(void *arg)
     int port = args->port;
     int status, valread, client_fd;
     struct sockaddr_in serv_addr;
-    char buffer[1024] = {0};
 
     // Create a socket
     if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
@@ -243,14 +243,15 @@ void *conn_to_server(void *arg)
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(port);
 
-    char ip_address[16]; // Assuming a maximum IPv4 address length of 15 characters
+    // char ip_address[16]; // Assuming a maximum IPv4 address length of 15 characters
 
     // Obtain the IP address from user input or configuration file
-    printf("Enter the IP address: ");
-    scanf("%15s", ip_address);
+    // printf("Enter the IP address: ");
+    // scanf("%15s", ip_address);
 
     // Convert IPv4 and IPv6 addresses from text to binary form
-    if (inet_pton(AF_INET, ip_address, &serv_addr.sin_addr) <= 0)
+    // if (inet_pton(AF_INET, ip_address, &serv_addr.sin_addr) <= 0)
+    if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0)
     {
         printf("\nInvalid address/ Address not supported \n");
         return NULL;
@@ -267,17 +268,23 @@ void *conn_to_server(void *arg)
     send(client_fd, &args->n, sizeof(int), 0);
     send(client_fd, &args->chunk, sizeof(int), 0);
 
+    printf("\nSending Matrix...\n");
     for (int i = args->start; i < args->end; i++)
     {
         for (int j = 0; j < args->n; j++)
             send(client_fd, &args->M[i][j], sizeof(float), 0);
     }
-    printf("\nMatrix sent!\n");
+    printf("Matrix sent!\n");
+
+    char buffer[1024] = {0};
+    valread = read(client_fd, buffer, 1024);
+    printf("\nReceived Message from Slave: %s\n", buffer);
+
 
     // destroyMatx(matx, n);
 
     // // Clear the buffer
-    // memset(matx, 0, sizeof(matx));
+    memset(buffer, 0, sizeof(buffer));
     // memset(array_recv, 0, sizeof(array_recv));
 
     // Close the connected socket
@@ -301,7 +308,7 @@ int main()
         scanf("%d", &port);
         start_server(port);
 
-        printf("Slave mode ending.\n");
+        printf("\nSlave mode ending.\n");
     }
     else if (choice == 2)
     {
@@ -333,14 +340,15 @@ int main()
         float **matx = createMatx(n, n);
         populateMatx(matx, n);
 
-        printMatx(matx, n, n);
-        printf("\nLast Element: %f\n", matx[n - 1][n - 1]);
+        // printMatx(matx, n, n);
 
         int chunk_size = (n - 1) / num_slaves;
 
+        struct timeval start_time, end_time;
+
+        gettimeofday(&start_time, NULL);
         for (int i = 0; i < num_slaves; i++)
         {
-            printf("\nPort: %d\n", port);
             int min = getMin(i);
             int max = getMax(i);
 
@@ -350,23 +358,28 @@ int main()
             if (i == 0)
                 args[i].start = 0;
             else
-                args[i].start = getMin((i + 1) * chunk_size);
+                args[i].start = getMin((i * chunk_size)+1);
 
             args[i].end = getMax((i + 1) * chunk_size) + 1;
             args[i].port = port;
             args[i].chunk = args[i].end - args[i].start;
 
-            printf("Start: %d, End: %d\n", args[i].start, args[i].end);
+            // printf("Start: %d, End: %d\n", args[i].start, args[i].end);
 
             pthread_create(&threads[i], NULL, conn_to_server, &args[i]);
-
-            printf("Port Sent:%d\n", port);
+            printf("Sent to port: %d\n", port);
 
             port++;
         }
 
         for (int i = 0; i < num_slaves; i++)
             pthread_join(threads[i], NULL);
+
+        gettimeofday(&end_time, NULL);
+        long seconds = end_time.tv_sec - start_time.tv_sec;
+        long micros = ((seconds * 1000000) + end_time.tv_usec) - (start_time.tv_usec);
+        double elapsed_time = (double)micros / 1000000.0;
+        printf("\nElapsed time: %.5f seconds\n", elapsed_time);
 
         printf("\nMaster mode ending.\n");
     }
