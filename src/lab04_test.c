@@ -89,8 +89,9 @@ int getMax(int n)
     return max;
 }
 
-void terrain_inter(float **matx, int row, int col)
+int terrain_inter(float **matx, int row, int col)
 {
+    printf("Calculating...\n");
     for (int i = 0; i < row; i++)
     {
         int min_x = getMin(i);
@@ -119,52 +120,97 @@ void terrain_inter(float **matx, int row, int col)
             }
         }
     }
+    printf("Matrix Calculation Done!\n");
+    return 0;
 }
 
 // SLAVE: Receive MASTER messages
-void handle_client(int client_socket)
+int handle_client(int client_socket, bool *calculation_finished)
 {
     int recv_cols;
     int recv_rows;
+    // Read col and row
     int bytesReceived1 = read(client_socket, &recv_cols, sizeof(int));
+    if (bytesReceived1 == -1)
+    {
+        perror("Error reading recv_cols");
+        // Handle the error, such as closing the socket and returning an error code
+        close(client_socket);
+        return 1;
+    }
+    else if (bytesReceived1 != sizeof(int))
+    {
+        fprintf(stderr, "Incomplete read for recv_cols\n");
+        // Handle the error, such as closing the socket and returning an error code
+        close(client_socket);
+        return 1;
+    }
+
     int bytesReceived2 = read(client_socket, &recv_rows, sizeof(int));
+    if (bytesReceived2 == -1)
+    {
+        perror("Error reading recv_rows");
+        // Handle the error, such as closing the socket and returning an error code
+        close(client_socket);
+        return 1;
+    }
+    else if (bytesReceived2 != sizeof(int))
+    {
+        fprintf(stderr, "Incomplete read for recv_rows\n");
+        // Handle the error, such as closing the socket and returning an error code
+        close(client_socket);
+        return 1;
+    }
 
-    printf("\nRow Length: %d\nCol Length:%d\n", recv_rows, recv_cols);
+    // Create matx template
+    float **result = createMatx(recv_rows, recv_cols);
 
-        float **result = createMatx(recv_rows, recv_cols);
-    int count = 0;
-    printf("\nReceiving Matrix...\n");
+    // printf("\nReceiving Matrix...\n");
     for (int row = 0; row < recv_rows; row++)
     {
         for (int col = 0; col < recv_cols; col++)
         {
             float recv_float;
-            // Read the float
+            // Get received float element and store in matx
             int bytesReceived = read(client_socket, &recv_float, sizeof(float));
-            // printf("Float: %f\n", recv_float);
-
-            // printf("Row: %d, Col: %d\n", row, col);
+            if (bytesReceived == -1)
+            {
+                perror("Error reading float element");
+                // Handle the error, such as closing the socket and returning an error code
+                close(client_socket);
+                return 1;
+            }
+            else if (bytesReceived != sizeof(float))
+            {
+                fprintf(stderr, "Incomplete read for float element\n");
+                // Handle the error, such as closing the socket and returning an error code
+                close(client_socket);
+                return 1;
+            }
             result[row][col] = recv_float;
+            // Clear buffer for next iteration
             memset(&recv_float, 0, sizeof(recv_float));
         }
     }
-    printf("Matrix Received\n");
-    printf("Calculating...\n");
+
+    // printf("Matrix Received\n");
+
+    // Interpolation
     terrain_inter(result, recv_rows, recv_cols);
-    printf("Matrix Calculated!\n");
 
-    // printMatx(result, recv_rows, recv_cols);
-
-    // Create a buffer to hold the formatted string
+    // Send acknowledgement
     char hello[10];
-    // Format the string with the PORT value
     sprintf(hello, "ahckkkkk!");
     send(client_socket, hello, strlen(hello), 0);
 
-    printf("\nSent ack back to client!\n");
+    // printf("\nSent ack back to client!\n");
 
     // Close the client socket
     close(client_socket);
+
+    // Notify while loop that execution is done to close connection
+    *calculation_finished = true;
+    return 0;
 }
 
 // SLAVE: Start listening on PORT
@@ -201,6 +247,7 @@ void *start_server(int port)
 
     printf("\nSlave listening on port %d\n", port);
 
+    bool calculation_finished = false;
     while (1)
     {
         // Accept a client connection
@@ -212,8 +259,12 @@ void *start_server(int port)
             exit(1);
         }
         printf("Master connected on port %d\n", port);
+
         // Handle the client connection in a separate function or thread
-        handle_client(client_socket);
+        handle_client(client_socket, &calculation_finished);
+
+        if (calculation_finished)
+            break;
     }
 
     printf("\nSlave listening on port %d has been closed.\n", port);
@@ -265,30 +316,54 @@ void *conn_to_server(void *arg)
         return NULL;
     }
 
+    printf("Connected to slave in PORT %d\n", args->port);
+
     send(client_fd, &args->n, sizeof(int), 0);
     send(client_fd, &args->chunk, sizeof(int), 0);
 
-    printf("\nSending Matrix...\n");
+    printf("Sending Matrix...\n");
     for (int i = args->start; i < args->end; i++)
     {
         for (int j = 0; j < args->n; j++)
-            send(client_fd, &args->M[i][j], sizeof(float), 0);
+        {
+            if (send(client_fd, &args->M[i][j], sizeof(float), 0) == -1)
+            {
+                perror("Error sending data");
+                // Handle the error, e.g., return or exit the function
+                return NULL;
+            }
+        }
     }
     printf("Matrix sent!\n");
 
     char buffer[1024] = {0};
-    valread = read(client_fd, buffer, 1024);
-    printf("\nReceived Message from Slave: %s\n", buffer);
+    valread = read(client_fd, buffer, sizeof(buffer));
 
+    if (valread == -1)
+    {
+        perror("Error reading data");
+        // Handle the error, e.g., return or exit the function
+        return NULL;
+    }
+    else if (valread == 0)
+    {
+        // Handle the case when the connection is closed
+        printf("Connection closed by the Slave.\n");
+        // Perform necessary cleanup or terminate the function
+        return NULL;
+    }
+
+    printf("Received Message from Slave: %s\n", buffer);
 
     // destroyMatx(matx, n);
 
-    // // Clear the buffer
+    // Clear the buffer
     memset(buffer, 0, sizeof(buffer));
     // memset(array_recv, 0, sizeof(array_recv));
 
     // Close the connected socket
     close(client_fd);
+    return NULL;
 }
 
 int main()
@@ -340,8 +415,6 @@ int main()
         float **matx = createMatx(n, n);
         populateMatx(matx, n);
 
-        // printMatx(matx, n, n);
-
         int chunk_size = (n - 1) / num_slaves;
 
         struct timeval start_time, end_time;
@@ -358,13 +431,11 @@ int main()
             if (i == 0)
                 args[i].start = 0;
             else
-                args[i].start = getMin((i * chunk_size)+1);
+                args[i].start = getMin((i * chunk_size) + 1);
 
             args[i].end = getMax((i + 1) * chunk_size) + 1;
             args[i].port = port;
             args[i].chunk = args[i].end - args[i].start;
-
-            // printf("Start: %d, End: %d\n", args[i].start, args[i].end);
 
             pthread_create(&threads[i], NULL, conn_to_server, &args[i]);
             printf("Sent to port: %d\n", port);
