@@ -243,8 +243,14 @@ void *conn_to_server(void *arg)
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(port);
 
+    char ip_address[16]; // Assuming a maximum IPv4 address length of 15 characters
+
+    // Obtain the IP address from user input or configuration file
+    printf("Enter the IP address: ");
+    scanf("%15s", ip_address);
+
     // Convert IPv4 and IPv6 addresses from text to binary form
-    if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0)
+    if (inet_pton(AF_INET, ip_address, &serv_addr.sin_addr) <= 0)
     {
         printf("\nInvalid address/ Address not supported \n");
         return NULL;
