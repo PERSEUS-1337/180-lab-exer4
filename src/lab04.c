@@ -1,9 +1,10 @@
-// CMSC 180 Lab 04
-// Author: Aron Resty Ramillano | 2020-01721
-// Section: T3L
-
 #define _GNU_SOURCE
+
 #include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
@@ -13,11 +14,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sched.h>
-// For sending data through sockets efficiently
-
-#include <msgpack.h>
-
-#define NUM_CORES 12
+#include <stdbool.h>
 
 typedef struct
 {
@@ -25,46 +22,51 @@ typedef struct
     int n;
     int start;
     int end;
-    int core_id;
-} ThreadArgs;
+    int port;
+    int chunk;
+} MasterArgs;
 
-/**
- * It creates a matrix of size n x n
- *
- * @param n the number of rows and columns in the matrix
- *
- * @return A pointer to a pointer to a float.
- */
-float **createMatx(int n)
+float **createMatx(int rows, int cols)
 {
-    float *values = malloc(n * sizeof(float));
-    float **rows = malloc(n * sizeof(float *));
-    for (int i = 0; i < n; ++i)
+    float **matrix = malloc(rows * sizeof(float *));
+
+    for (int i = 0; i < rows; i++)
     {
-        rows[i] = malloc(sizeof(float) * n);
+        matrix[i] = malloc(cols * sizeof(float));
     }
-    return rows;
+
+    return matrix;
 }
 
-/**
- * It frees the memory allocated for the matrix.
- *
- * @param matx The matrix to be destroyed.
- */
 void destroyMatx(float **matx, int n)
 {
-    // Old implementation
-    // free(*matx);
-    // free(matx);
-
-    // New Implementation
-    // Free mem of each row
-    for (int i = 0; i < n; ++i)
-    {
+    for (int i = 0; i < n; i++)
         free(matx[i]);
-    }
-    // Free mem of array of row pointers
+
     free(matx);
+
+    matx = NULL;
+}
+
+void populateMatx(float **matx, int n)
+{
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++)
+            if ((i % 10 == 0) && (j % 10 == 0))
+                matx[i][j] = (rand() % (1000));
+}
+
+void printMatx(float **matx, int rows, int cols)
+{
+    printf("\nPrint the %d x %d (+1) Matrix:\n", cols - 1, rows - 1);
+    for (int i = 0; i < rows; i++)
+    {
+        for (int j = 0; j < cols; j++)
+        {
+            printf("%.3f ", matx[i][j]);
+        }
+        printf("\n");
+    }
 }
 
 int getMin(int n)
@@ -87,71 +89,14 @@ int getMax(int n)
     return max;
 }
 
-/**
- * It prints a matrix of size n x n
- *
- * @param matx The matrix to be printed
- * @param n the number of rows and columns in the matrix
- */
-void printMatx(float **matx, int n)
+int terrain_inter(float **matx, int row, int col)
 {
-    printf("\nPrint the %d x %d Matrix:\n", n - 1, n - 1);
-    for (int i = 0; i < n; i++)
-    {
-        for (int j = 0; j < n; j++)
-        {
-            printf("%.3f ", matx[i][j]);
-        }
-        printf("\n");
-    }
-}
-
-/**
- * This function populates the matrix with random numbers. It will only populate on coordinates that is divisible by 10, including 0,0
- *
- * @param matx the matrix to be populated
- * @param n the size of the matrix
- */
-void populateMatx(float **matx, int n)
-{
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < n; j++)
-            if ((i % 10 == 0) && (j % 10 == 0))
-                matx[i][j] = (rand() % (1000));
-}
-
-/**
- * It takes a 2D array of floats, and for each element in the array, it calculates the average
- * elevation of the surrounding elements
- *
- * @param arg The argument passed to the thread function.
- *
- * @return a void pointer.
- */
-void *thread_func(void *arg)
-{
-    ThreadArgs *args = (ThreadArgs *)arg;
-    const pthread_t pid = pthread_self();
-    const int core_id = args->core_id;
-
-    // cpu_set_t: This data set is a bitset where each bit represents a CPU.
-    cpu_set_t cpuset;
-    // CPU_ZERO: This macro initializes the CPU set to be the empty set.
-    CPU_ZERO(&cpuset);
-    // CPU_SET: This macro adds cpu to the CPU set.
-    CPU_SET(core_id, &cpuset);
-
-    const int set_result = pthread_setaffinity_np(pid, sizeof(cpu_set_t), &cpuset);
-
-    // Comment out code below to see results
-    // const int get_affinity = pthread_getaffinity_np(pid, sizeof(cpu_set_t), &cpuset);
-    // printf("core_id: %d, set_result: %d, get_affinity: %d\n", core_id, set_result, get_affinity);
-
-    for (int i = args->start; i < args->end; i++)
+    printf("Calculating...\n");
+    for (int i = 0; i < row; i++)
     {
         int min_x = getMin(i);
         int max_x = getMax(i);
-        for (int j = 0; j < args->n; j++)
+        for (int j = 0; j < col; j++)
         {
             if (!((i % 10 == 0) && (j % 10 == 0)))
             {
@@ -163,231 +108,356 @@ void *thread_func(void *arg)
                 int area_b = (abs(min_x - i) * abs(max_y - j));
                 int area_a = (abs(max_x - i) * abs(max_y - j));
 
-                float elev_a = args->M[min_x][min_y];
-                float elev_b = args->M[max_x][min_y];
-                float elev_c = args->M[min_x][max_y];
-                float elev_d = args->M[max_x][max_y];
+                float elev_a = matx[min_x][min_y];
+                float elev_b = matx[max_x][min_y];
+                float elev_c = matx[min_x][max_y];
+                float elev_d = matx[max_x][max_y];
 
                 float elevation = ((area_a * elev_a) + (area_b * elev_b) + (area_c * elev_c) + (area_d * elev_d)) / (float)(area_a + area_b + area_c + area_d);
 
-                args->M[i][j] = elevation;
-                // printf("Boundary: %i %i | Coords: %i %i | Val: %f\n", args->start, args->end, i, j, elevation);
+                matx[i][j] = elevation;
             }
         }
     }
+    printf("Matrix Calculation Done!\n");
+    return 0;
+}
+
+// SLAVE: Receive MASTER messages
+int handle_client(int client_socket, bool *calculation_finished)
+{
+    int recv_cols;
+    int recv_rows;
+    // Read col and row
+    int bytesReceived1 = read(client_socket, &recv_cols, sizeof(int));
+    if (bytesReceived1 == -1)
+    {
+        perror("Error reading recv_cols");
+        // Handle the error, such as closing the socket and returning an error code
+        close(client_socket);
+        return 1;
+    }
+    else if (bytesReceived1 != sizeof(int))
+    {
+        fprintf(stderr, "Incomplete read for recv_cols\n");
+        // Handle the error, such as closing the socket and returning an error code
+        close(client_socket);
+        return 1;
+    }
+
+    int bytesReceived2 = read(client_socket, &recv_rows, sizeof(int));
+    if (bytesReceived2 == -1)
+    {
+        perror("Error reading recv_rows");
+        // Handle the error, such as closing the socket and returning an error code
+        close(client_socket);
+        return 1;
+    }
+    else if (bytesReceived2 != sizeof(int))
+    {
+        fprintf(stderr, "Incomplete read for recv_rows\n");
+        // Handle the error, such as closing the socket and returning an error code
+        close(client_socket);
+        return 1;
+    }
+
+    // Create matx template
+    float **result = createMatx(recv_rows, recv_cols);
+
+    // printf("\nReceiving Matrix...\n");
+    for (int row = 0; row < recv_rows; row++)
+    {
+        for (int col = 0; col < recv_cols; col++)
+        {
+            float recv_float;
+            // Get received float element and store in matx
+            int bytesReceived = read(client_socket, &recv_float, sizeof(float));
+            if (bytesReceived == -1)
+            {
+                perror("Error reading float element");
+                // Handle the error, such as closing the socket and returning an error code
+                close(client_socket);
+                return 1;
+            }
+            else if (bytesReceived != sizeof(float))
+            {
+                fprintf(stderr, "Incomplete read for float element\n");
+                // Handle the error, such as closing the socket and returning an error code
+                close(client_socket);
+                return 1;
+            }
+            result[row][col] = recv_float;
+            // Clear buffer for next iteration
+            memset(&recv_float, 0, sizeof(recv_float));
+        }
+    }
+
+    // printf("Matrix Received\n");
+
+    // Interpolation
+    terrain_inter(result, recv_rows, recv_cols);
+
+    // Send acknowledgement
+    char hello[10];
+    sprintf(hello, "ahckkkkk!");
+    send(client_socket, hello, strlen(hello), 0);
+
+    // printf("\nSent ack back to client!\n");
+
+    // Close the client socket
+    close(client_socket);
+
+    // Notify while loop that execution is done to close connection
+    *calculation_finished = true;
+    return 0;
+}
+
+// SLAVE: Start listening on PORT
+void *start_server(int port)
+{
+    int server_fd, client_socket;
+    struct sockaddr_in server_addr, client_addr;
+    socklen_t client_addr_len;
+
+    // Create the server socket
+    server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_fd < 0)
+    {
+        perror("Error creating socket");
+        exit(1);
+    }
+
+    // Bind the server socket to the specified port
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port = htons(port);
+    if (bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
+    {
+        perror("Error binding socket");
+        exit(1);
+    }
+
+    // Listen for incoming connections
+    if (listen(server_fd, 5) < 0)
+    {
+        perror("Error listening");
+        exit(1);
+    }
+
+    printf("\nSlave listening on port %d\n", port);
+
+    bool calculation_finished = false;
+    while (1)
+    {
+        // Accept a client connection
+        client_addr_len = sizeof(client_addr);
+        client_socket = accept(server_fd, (struct sockaddr *)&client_addr, &client_addr_len);
+        if (client_socket < 0)
+        {
+            perror("Error accepting connection");
+            exit(1);
+        }
+        printf("Master connected on port %d\n", port);
+
+        // Handle the client connection in a separate function or thread
+        handle_client(client_socket, &calculation_finished);
+
+        if (calculation_finished)
+            break;
+    }
+
+    printf("\nSlave listening on port %d has been closed.\n", port);
+
+    // Close the server socket
+    close(server_fd);
 
     return NULL;
 }
 
-/**
- * It creates a thread for each submatrix that we are going to create
- *
- * @param M The matrix that we are going to be iterating through
- * @param n The size of the matrix
- * @param num_threads The number of threads that will be created
- */
-void terrain_inter(float **M, int n, int num_threads)
+// MASTER: Connect to SLAVE PORTS
+void *conn_to_server(void *arg)
 {
-    pthread_t threads[num_threads];
-    ThreadArgs args[num_threads];
+    MasterArgs *args = (MasterArgs *)arg;
+    int port = args->port;
+    int status, valread, client_fd;
+    struct sockaddr_in serv_addr;
 
-    // This is basically the submatrices that we are going to make.
-    int chunk_size = n / num_threads;
-
-    for (int i = 0; i < num_threads; i++)
+    // Create a socket
+    if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
-        args[i].M = M;
-        args[i].n = n;
-        args[i].start = i * chunk_size;
-        args[i].end = (i + 1) * chunk_size;
-        args[i].core_id = (i % NUM_CORES);
-
-        // Because the matrix should include the 0th coordinate, we would have to adjust our calculation to have the last submatrix to be able to handle a second row.
-        if (num_threads > 1 && i == num_threads - 1)
-        {
-            args[i].end++;
-        }
-
-        // Actual implementation of creating a thread
-        // We pass the arguments stated above on where on the matrix they should start
-        pthread_create(&threads[i], NULL, thread_func, &args[i]);
+        printf("\n Socket creation error \n");
+        return NULL;
     }
 
-    // This will join the threads if they are finished in their operation, therefore finishing this terrain_inter function
-    for (int i = 0; i < num_threads; i++)
+    // Set up the server address
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port = htons(port);
+
+    // char ip_address[16]; // Assuming a maximum IPv4 address length of 15 characters
+
+    // Obtain the IP address from user input or configuration file
+    // printf("Enter the IP address: ");
+    // scanf("%15s", ip_address);
+
+    // Convert IPv4 and IPv6 addresses from text to binary form
+    // if (inet_pton(AF_INET, ip_address, &serv_addr.sin_addr) <= 0)
+    if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0)
     {
-        pthread_join(threads[i], NULL);
-    }
-}
-
-/**
- * It creates a matrix of size n, populates it with random values, and then calls the terrain_inter
- * function.
- * This benchmark is designed to output the necessary information needed for the exercise lab report
- *
- * @param n The size of the matrix.
- */
-void run_benchmark(int n, int t)
-{
-    // Generate new RNG
-    srand(time(NULL));
-    n++;
-
-    float **matx = createMatx(n);
-    populateMatx(matx, n);
-
-    // Get start time
-    struct timeval start_time, end_time;
-    gettimeofday(&start_time, NULL);
-
-    // Do interpolation
-    terrain_inter(matx, n, t);
-
-    // Get end time
-    gettimeofday(&end_time, NULL);
-    long seconds = end_time.tv_sec - start_time.tv_sec;
-    long micros = ((seconds * 1000000) + end_time.tv_usec) - (start_time.tv_usec);
-    double elapsed_time = (double)micros / 1000000.0;
-
-    // Clean matrix print
-    // printMatx(matx, n);
-
-    printf("Threads: %i, Elapsed time: %.5f seconds\n", t, elapsed_time);
-
-    // Free memory
-    destroyMatx(matx, n);
-}
-
-void benchmark_input()
-{
-    // Matrix size input
-    int n = 0, sleep_sec = 0;
-    printf("Enter n (for benchmark): ");
-    int check = scanf("%d", &n);
-
-    /*
-    Input checker on:
-    - if no input
-    - if n <= 9
-    - if n not divisible by 10
-    */
-    while (!check || n <= 9 || n % 10 != 0)
-    {
-        printf("Wrong Input! Try again: ");
-        check = scanf("%d", &n);
+        printf("\nInvalid address/ Address not supported \n");
+        return NULL;
     }
 
-    printf("\nCalculating a %d x %d matrix\nBenchmark will run 3x\nSleep for %d seconds each run\n", n, n, sleep_sec);
-
-    for (int i = 0; i < 3; i++)
+    // Connect to the server
+    if ((status = connect(client_fd, (struct sockaddr *)&serv_addr,
+                          sizeof(serv_addr))) < 0)
     {
-        printf("Run # %d\n", i + 1);
-        for (int j = 1; j <= 64; j *= 2)
-        {
-            run_benchmark(n, j);
-        }
+        printf("\nConnection Failed \n");
+        return NULL;
+    }
 
-        // Sleep after every run
-        if (i == 2)
-            break;
-        if (sleep_sec)
+    printf("Connected to slave in PORT %d\n", args->port);
+
+    send(client_fd, &args->n, sizeof(int), 0);
+    send(client_fd, &args->chunk, sizeof(int), 0);
+
+    printf("Sending Matrix...\n");
+    for (int i = args->start; i < args->end; i++)
+    {
+        for (int j = 0; j < args->n; j++)
         {
-            printf("...Sleep for %d seconds...\n", sleep_sec);
-            sleep(sleep_sec);
+            if (send(client_fd, &args->M[i][j], sizeof(float), 0) == -1)
+            {
+                perror("Error sending data");
+                // Handle the error, e.g., return or exit the function
+                return NULL;
+            }
         }
     }
-}
+    printf("Matrix sent!\n");
 
-void user_input()
-{
-    // Matrix size input
-    int n = 0, t = 0;
-    printf("Enter n divisible by 10: ");
-    int check = scanf("%d", &n);
+    char buffer[1024] = {0};
+    valread = read(client_fd, buffer, sizeof(buffer));
 
-    /*
-    Input checker on:
-    - if no input
-    - if n <= 9
-    - if n not divisible by 10
-    */
-    while (!check || n <= 9 || n % 10 != 0)
+    if (valread == -1)
     {
-        printf("Wrong Input! Try again: ");
-        check = scanf("%d", &n);
+        perror("Error reading data");
+        // Handle the error, e.g., return or exit the function
+        return NULL;
+    }
+    else if (valread == 0)
+    {
+        // Handle the case when the connection is closed
+        printf("Connection closed by the Slave.\n");
+        // Perform necessary cleanup or terminate the function
+        return NULL;
     }
 
-    // Thread number input
-    printf("Enter t that can divide n: ");
-    check = scanf("%d", &t);
+    printf("Received Message from Slave: %s\n", buffer);
 
-    /*
-    Input checker on:
-    - if no input
-    - if n is not divisible by t
-    - if t < 1
-    */
-    while (!check || n % t != 0 || t < 1)
-    {
-        printf("Wrong Input! Try again: ");
-        check = scanf("%d", &t);
-    }
+    // destroyMatx(matx, n);
 
-    // +1 to include 10th coord
-    n++;
+    // Clear the buffer
+    memset(buffer, 0, sizeof(buffer));
+    // memset(array_recv, 0, sizeof(array_recv));
 
-    // Generate new RNG
-    srand(time(NULL));
-
-    // Create and Populate Matrix
-    float **matx = createMatx(n);
-    populateMatx(matx, n);
-
-    // Get start time
-    struct timeval start_time, end_time;
-    gettimeofday(&start_time, NULL);
-
-    // Do interpolation
-    terrain_inter(matx, n, t);
-
-    // Get end time
-    gettimeofday(&end_time, NULL);
-    long seconds = end_time.tv_sec - start_time.tv_sec;
-    long micros = ((seconds * 1000000) + end_time.tv_usec) - (start_time.tv_usec);
-    double elapsed_time = (double)micros / 1000000.0;
-
-    // Clean matrix print
-    printMatx(matx, n);
-
-    printf("\nElapsed time: %.5f seconds\n", elapsed_time);
-
-    destroyMatx(matx, n);
+    // Close the connected socket
+    close(client_fd);
+    return NULL;
 }
 
 int main()
 {
-    // Matrix size input
-    int n = 0;
-    printf("Enter [1] for User Input\nEnter [2] for auto benchmark\nEnter [3] for data testing\n>>> ");
-    int check = scanf("%d", &n);
+    int choice;
+    printf("Choose mode:\n");
+    printf("1. Slave\n");
+    printf("2. Master\n");
+    printf("Enter your choice: ");
+    scanf("%d", &choice);
 
-    /*
-    Input checker on:
-    - if no input
-    - if n <= 9
-    - if n not divisible by 10
-    */
-    while (!check || n > 3 || n < 1)
+    if (choice == 1)
     {
-        printf("Wrong Input! Try again\n>>> ");
-        check = scanf("%d", &n);
+        int port;
+
+        printf("Enter your port: ");
+        scanf("%d", &port);
+        start_server(port);
+
+        printf("\nSlave mode ending.\n");
     }
-    if (n == 1)
-        user_input();
-    else if (n == 2)
-        benchmark_input();
+    else if (choice == 2)
+    {
+        int port;
+        int num_slaves;
+        int n = 0;
+        srand(time(NULL));
+
+        printf("Enter PORT: ");
+        scanf("%d", &port);
+
+        printf("Enter the number of slaves to connect to: ");
+        scanf("%d", &num_slaves);
+
+        printf("Enter n: ");
+        int check = scanf("%d", &n);
+        while (!check || n <= 9 || n % 10 != 0)
+        {
+            printf("Wrong Input! Try again: ");
+            check = scanf("%d", &n);
+        }
+
+        // To compensate for extra 0-th coordinate
+        n++;
+
+        pthread_t threads[num_slaves];
+        MasterArgs args[num_slaves];
+
+        float **matx = createMatx(n, n);
+        populateMatx(matx, n);
+
+        int chunk_size = (n - 1) / num_slaves;
+
+        struct timeval start_time, end_time;
+
+        gettimeofday(&start_time, NULL);
+        for (int i = 0; i < num_slaves; i++)
+        {
+            int min = getMin(i);
+            int max = getMax(i);
+
+            args[i].M = matx;
+            args[i].n = n;
+
+            if (i == 0)
+                args[i].start = 0;
+            else
+                args[i].start = getMin((i * chunk_size) + 1);
+
+            args[i].end = getMax((i + 1) * chunk_size) + 1;
+            args[i].port = port;
+            args[i].chunk = args[i].end - args[i].start;
+
+            pthread_create(&threads[i], NULL, conn_to_server, &args[i]);
+            printf("Sent to port: %d\n", port);
+
+            port++;
+        }
+
+        for (int i = 0; i < num_slaves; i++)
+            pthread_join(threads[i], NULL);
+
+        gettimeofday(&end_time, NULL);
+        long seconds = end_time.tv_sec - start_time.tv_sec;
+        long micros = ((seconds * 1000000) + end_time.tv_usec) - (start_time.tv_usec);
+        double elapsed_time = (double)micros / 1000000.0;
+        printf("\nElapsed time: %.5f seconds\n", elapsed_time);
+
+        printf("\nMaster mode ending.\n");
+    }
     else
-        packer_test();
+    {
+        printf("Invalid choice.\n");
+        return 1;
+    }
 
     return 0;
 }
