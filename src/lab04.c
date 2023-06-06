@@ -15,6 +15,7 @@
 #include <errno.h>
 #include <sched.h>
 #include <stdbool.h>
+#include <netdb.h>
 
 typedef struct
 {
@@ -23,6 +24,7 @@ typedef struct
     int start;
     int end;
     int port;
+    char *ip_addr;
     int chunk;
 } MasterArgs;
 
@@ -58,14 +60,14 @@ void populateMatx(float **matx, int n)
 
 void printMatx(float **matx, int rows, int cols)
 {
-    printf("\nPrint the %d x %d (+1) Matrix:\n", cols - 1, rows - 1);
+    // printf("\nPrint the %d x %d (+1) Matrix:\n", cols - 1, rows - 1);
     for (int i = 0; i < rows; i++)
     {
         for (int j = 0; j < cols; j++)
         {
-            printf("%.3f ", matx[i][j]);
+            // printf("%.3f ", matx[i][j]);
         }
-        printf("\n");
+        // printf("\n");
     }
 }
 
@@ -89,9 +91,42 @@ int getMax(int n)
     return max;
 }
 
+void get_host_name()
+{
+    char hostname[256];
+
+    // Get the hostname
+    if (gethostname(hostname, sizeof(hostname)) == -1)
+    {
+        perror("Error getting hostname");
+        exit(1);
+    }
+
+    // Get host information by name
+    struct hostent *host = gethostbyname(hostname);
+    if (host == NULL)
+    {
+        perror("Error getting host information");
+        exit(1);
+    }
+
+    // Convert the first IP address to a string and print
+    struct in_addr **addr_list = (struct in_addr **)host->h_addr_list;
+    char ip_address[INET_ADDRSTRLEN];
+    if (inet_ntop(AF_INET, addr_list[0], ip_address, INET_ADDRSTRLEN) == NULL)
+    {
+        perror("Error converting IP address");
+        exit(1);
+    }
+
+    // printf("Current IP address: %s\n", ip_address);
+
+    return;
+}
+
 int terrain_inter(float **matx, int row, int col)
 {
-    printf("Calculating...\n");
+    // printf("Calculating...\n");
     for (int i = 0; i < row; i++)
     {
         int min_x = getMin(i);
@@ -119,10 +154,9 @@ int terrain_inter(float **matx, int row, int col)
             }
         }
     }
-    printf("Matrix Calculation Done!\n");
+    // printf("Matrix Calculation Done!\n");
     return 0;
 }
-
 // SLAVE: Receive MASTER messages
 int handle_client(int client_socket, bool *calculation_finished)
 {
@@ -139,7 +173,7 @@ int handle_client(int client_socket, bool *calculation_finished)
     }
     else if (bytesReceived1 != sizeof(int))
     {
-        fprintf(stderr, "Incomplete read for recv_cols\n");
+        // fprintf(stderr, "Incomplete read for recv_cols\n");
         // Handle the error, such as closing the socket and returning an error code
         close(client_socket);
         return 1;
@@ -155,7 +189,7 @@ int handle_client(int client_socket, bool *calculation_finished)
     }
     else if (bytesReceived2 != sizeof(int))
     {
-        fprintf(stderr, "Incomplete read for recv_rows\n");
+        // fprintf(stderr, "Incomplete read for recv_rows\n");
         // Handle the error, such as closing the socket and returning an error code
         close(client_socket);
         return 1;
@@ -164,7 +198,7 @@ int handle_client(int client_socket, bool *calculation_finished)
     // Create matx template
     float **result = createMatx(recv_rows, recv_cols);
 
-    // printf("\nReceiving Matrix...\n");
+    printf("\nReceiving Matrix...\n");
     for (int row = 0; row < recv_rows; row++)
     {
         for (int col = 0; col < recv_cols; col++)
@@ -181,7 +215,7 @@ int handle_client(int client_socket, bool *calculation_finished)
             }
             else if (bytesReceived != sizeof(float))
             {
-                fprintf(stderr, "Incomplete read for float element\n");
+                // fprintf(stderr, "Incomplete read for float element\n");
                 // Handle the error, such as closing the socket and returning an error code
                 close(client_socket);
                 return 1;
@@ -192,17 +226,17 @@ int handle_client(int client_socket, bool *calculation_finished)
         }
     }
 
-    // printf("Matrix Received\n");
+    printf("Matrix Received\n");
 
     // Interpolation
     terrain_inter(result, recv_rows, recv_cols);
 
     // Send acknowledgement
     char hello[10];
-    sprintf(hello, "ahckkkkk!");
+    // sprintf(hello, "ahckkkkk!");
     send(client_socket, hello, strlen(hello), 0);
 
-    // printf("\nSent ack back to client!\n");
+    printf("\nSent ack back to client!\n");
 
     // Close the client socket
     close(client_socket);
@@ -244,8 +278,9 @@ void *start_server(int port)
         exit(1);
     }
 
-    printf("\nSlave listening on port %d\n", port);
+    // printf("\nSlave listening on port %d\n", port);
 
+    get_host_name();
     bool calculation_finished = false;
     while (1)
     {
@@ -257,7 +292,7 @@ void *start_server(int port)
             perror("Error accepting connection");
             exit(1);
         }
-        printf("Master connected on port %d\n", port);
+        // printf("Master connected on port %d\n", port);
 
         // Handle the client connection in a separate function or thread
         handle_client(client_socket, &calculation_finished);
@@ -266,7 +301,7 @@ void *start_server(int port)
             break;
     }
 
-    printf("\nSlave listening on port %d has been closed.\n", port);
+    // printf("\nSlave listening on port %d has been closed.\n", port);
 
     // Close the server socket
     close(server_fd);
@@ -279,31 +314,36 @@ void *conn_to_server(void *arg)
 {
     MasterArgs *args = (MasterArgs *)arg;
     int port = args->port;
+    char *ip_addr = args->ip_addr;
     int status, valread, client_fd;
     struct sockaddr_in serv_addr;
 
     // Create a socket
     if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
-        printf("\n Socket creation error \n");
+        // printf("\n Socket creation error \n");
         return NULL;
     }
+
+    // char ip_address[16]; // Assuming a maximum IPv4 address length of 15 characters
+
+    // // Obtain the IP address from user input or configuration file
+    // printf("Enter the IP address: ");
+    // scanf("%15s", ip_address);
+
+    // int port;
+    // printf("Enter PORT: ");
+    // scanf("%d", &port);
 
     // Set up the server address
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(port);
 
-    // char ip_address[16]; // Assuming a maximum IPv4 address length of 15 characters
-
-    // Obtain the IP address from user input or configuration file
-    // printf("Enter the IP address: ");
-    // scanf("%15s", ip_address);
-
     // Convert IPv4 and IPv6 addresses from text to binary form
-    // if (inet_pton(AF_INET, ip_address, &serv_addr.sin_addr) <= 0)
-    if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0)
+    if (inet_pton(AF_INET, ip_addr, &serv_addr.sin_addr) <= 0)
+    // if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0)
     {
-        printf("\nInvalid address/ Address not supported \n");
+        // printf("\nInvalid address/ Address not supported \n");
         return NULL;
     }
 
@@ -311,16 +351,16 @@ void *conn_to_server(void *arg)
     if ((status = connect(client_fd, (struct sockaddr *)&serv_addr,
                           sizeof(serv_addr))) < 0)
     {
-        printf("\nConnection Failed \n");
+        // printf("\nConnection Failed \n");
         return NULL;
     }
 
-    printf("Connected to slave in PORT %d\n", args->port);
+    // printf("Connected to slave in PORT %d\n", port);
 
     send(client_fd, &args->n, sizeof(int), 0);
     send(client_fd, &args->chunk, sizeof(int), 0);
 
-    printf("Sending Matrix...\n");
+    // printf("Sending Matrix...\n");
     for (int i = args->start; i < args->end; i++)
     {
         for (int j = 0; j < args->n; j++)
@@ -333,7 +373,7 @@ void *conn_to_server(void *arg)
             }
         }
     }
-    printf("Matrix sent!\n");
+    // printf("Matrix sent!\n");
 
     char buffer[1024] = {0};
     valread = read(client_fd, buffer, sizeof(buffer));
@@ -347,12 +387,12 @@ void *conn_to_server(void *arg)
     else if (valread == 0)
     {
         // Handle the case when the connection is closed
-        printf("Connection closed by the Slave.\n");
+        // printf("Connection closed by the Slave.\n");
         // Perform necessary cleanup or terminate the function
         return NULL;
     }
 
-    printf("Received Message from Slave: %s\n", buffer);
+    // printf("Received Message from Slave: %s\n", buffer);
 
     // destroyMatx(matx, n);
 
@@ -368,40 +408,40 @@ void *conn_to_server(void *arg)
 int main()
 {
     int choice;
-    printf("Choose mode:\n");
-    printf("1. Slave\n");
-    printf("2. Master\n");
-    printf("Enter your choice: ");
+    // printf("Choose mode:\n");
+    // printf("1. Slave\n");
+    // printf("2. Master\n");
+    // printf("Enter your choice: ");
     scanf("%d", &choice);
 
     if (choice == 1)
     {
         int port;
 
-        printf("Enter your port: ");
+        // printf("Enter your port: ");
         scanf("%d", &port);
         start_server(port);
 
-        printf("\nSlave mode ending.\n");
+        // printf("\nSlave mode ending.\n");
     }
     else if (choice == 2)
     {
-        int port;
+        // int port;
         int num_slaves;
         int n = 0;
         srand(time(NULL));
 
-        printf("Enter PORT: ");
-        scanf("%d", &port);
+        // printf("Enter PORT: ");
+        // scanf("%d", &port);
 
-        printf("Enter the number of slaves to connect to: ");
+        // printf("Enter the number of slaves to connect to: \n");
         scanf("%d", &num_slaves);
 
-        printf("Enter n: ");
+        // printf("Enter n: \n");
         int check = scanf("%d", &n);
         while (!check || n <= 9 || n % 10 != 0)
         {
-            printf("Wrong Input! Try again: ");
+            // printf("Wrong Input! Try again: \n");
             check = scanf("%d", &n);
         }
 
@@ -419,10 +459,20 @@ int main()
         struct timeval start_time, end_time;
 
         gettimeofday(&start_time, NULL);
+        printf("Sending Matrix...\n");
         for (int i = 0; i < num_slaves; i++)
         {
+            char ip_address[16]; // Assuming a maximum IPv4 address length of 15 characters
+            int port;
             int min = getMin(i);
             int max = getMax(i);
+
+            // Obtain the IP address from user input or configuration file
+            // printf("Enter the IP address: \n");
+            scanf("%15s", ip_address);
+
+            // printf("Enter PORT: \n");
+            scanf("%d", &port);
 
             args[i].M = matx;
             args[i].n = n;
@@ -434,12 +484,13 @@ int main()
 
             args[i].end = getMax((i + 1) * chunk_size) + 1;
             args[i].port = port;
+            args[i].ip_addr = ip_address;
             args[i].chunk = args[i].end - args[i].start;
 
             pthread_create(&threads[i], NULL, conn_to_server, &args[i]);
-            printf("Sent to port: %d\n", port);
+            // printf("Sent to IP and PORT: %s : %d\n", ip_address, port);
 
-            port++;
+            // port++;
         }
 
         for (int i = 0; i < num_slaves; i++)
@@ -449,13 +500,14 @@ int main()
         long seconds = end_time.tv_sec - start_time.tv_sec;
         long micros = ((seconds * 1000000) + end_time.tv_usec) - (start_time.tv_usec);
         double elapsed_time = (double)micros / 1000000.0;
-        printf("\nElapsed time: %.5f seconds\n", elapsed_time);
+        printf("\nCalculation Complete!\n\t> Matrix Size: %d x %d\n\t> Number of Slaves: %d\n\t> Elapsed Time (from sending to calculating): %.5f\n", n, n, num_slaves, elapsed_time);
+        // printf("\nElapsed time: %.5f seconds\n", elapsed_time);
 
         printf("\nMaster mode ending.\n");
     }
     else
     {
-        printf("Invalid choice.\n");
+        // printf("Invalid choice.\n");
         return 1;
     }
 
