@@ -1,0 +1,190 @@
+Specs:
+
+CPU: Ryzen 5 3600 @ 4.0 GHz
+RAM: 16GB 3200MHz CL16 Trident Z Neo
+MOBO: MSI b450 Mortar Titanium
+SSD: WD Blue SN500 250gb NVMe
+
+Slaves: 16
+    Calculation Complete!
+        > Matrix Size: 8001 x 8001
+        > Number of Slaves: 16
+        > Elapsed Time (from sending to calculating): 4.82444
+
+    Calculation Complete!
+        > Matrix Size: 8001 x 8001
+        > Number of Slaves: 16
+        > Elapsed Time (from sending to calculating): 4.74108
+
+    Calculation Complete!
+        > Matrix Size: 8001 x 8001
+        > Number of Slaves: 16
+        > Elapsed Time (from sending to calculating): 4.74526
+
+    Calculation Complete!
+        > Matrix Size: 4001 x 4001
+        > Number of Slaves: 16
+        > Elapsed Time (from sending to calculating): 1.23725
+
+    Calculation Complete!
+        > Matrix Size: 4001 x 4001
+        > Number of Slaves: 16
+        > Elapsed Time (from sending to calculating): 1.34893
+
+    Calculation Complete!
+        > Matrix Size: 4001 x 4001
+        > Number of Slaves: 16
+        > Elapsed Time (from sending to calculating): 1.25313
+
+    Calculation Complete!
+        > Matrix Size: 1001 x 1001
+        > Number of Slaves: 16
+        > Elapsed Time (from sending to calculating): 0.18448
+
+    Calculation Complete!
+        > Matrix Size: 1001 x 1001
+        > Number of Slaves: 16
+        > Elapsed Time (from sending to calculating): 0.15044
+
+    Calculation Complete!
+        > Matrix Size: 1001 x 1001
+        > Number of Slaves: 16
+        > Elapsed Time (from sending to calculating): 0.17621
+
+Slaves: 8
+    Calculation Complete!
+        > Matrix Size: 8001 x 8001
+        > Number of Slaves: 8
+        > Elapsed Time (from sending to calculating): 4.66168
+
+    Calculation Complete!
+        > Matrix Size: 8001 x 8001
+        > Number of Slaves: 8
+        > Elapsed Time (from sending to calculating): 4.71364
+
+    Calculation Complete!
+        > Matrix Size: 8001 x 8001
+        > Number of Slaves: 8     
+        > Elapsed Time (from sending to calculating): 4.97040
+
+    Calculation Complete!
+        > Matrix Size: 4001 x 4001
+        > Number of Slaves: 8
+        > Elapsed Time (from sending to calculating): 1.23405
+
+    Calculation Complete!
+        > Matrix Size: 4001 x 4001
+        > Number of Slaves: 8     
+        > Elapsed Time (from sending to calculating): 1.23125
+
+    Calculation Complete!
+        > Matrix Size: 4001 x 4001
+        > Number of Slaves: 8
+        > Elapsed Time (from sending to calculating): 1.23542
+
+    Calculation Complete!
+        > Matrix Size: 1001 x 1001
+        > Number of Slaves: 8
+        > Elapsed Time (from sending to calculating): 0.11048
+
+    Calculation Complete!
+        > Matrix Size: 1001 x 1001
+        > Number of Slaves: 8
+        > Elapsed Time (from sending to calculating): 0.08891
+
+    Calculation Complete!
+        > Matrix Size: 1001 x 1001
+        > Number of Slaves: 8
+        > Elapsed Time (from sending to calculating): 0.10740
+
+Slaves: 4
+    Calculation Complete!
+        > Matrix Size: 8001 x 8001
+        > Number of Slaves: 4
+        > Elapsed Time (from sending to calculating): 5.53439
+    
+    Calculation Complete!
+        > Matrix Size: 8001 x 8001
+        > Number of Slaves: 4
+        > Elapsed Time (from sending to calculating): 5.55866
+
+    Calculation Complete!
+        > Matrix Size: 8001 x 8001
+        > Number of Slaves: 4
+        > Elapsed Time (from sending to calculating): 5.51797
+
+    Calculation Complete!
+        > Matrix Size: 4001 x 4001
+        > Number of Slaves: 4
+        > Elapsed Time (from sending to calculating): 1.42665
+
+    Calculation Complete!
+        > Matrix Size: 4001 x 4001
+        > Number of Slaves: 4
+        > Elapsed Time (from sending to calculating): 1.40413
+
+    Calculation Complete!
+        > Matrix Size: 4001 x 4001
+        > Number of Slaves: 4
+        > Elapsed Time (from sending to calculating): 1.33747
+
+    Calculation Complete!
+        > Matrix Size: 1001 x 1001
+        > Number of Slaves: 4
+        > Elapsed Time (from sending to calculating): 0.10503
+
+    Calculation Complete!
+        > Matrix Size: 1001 x 1001
+        > Number of Slaves: 4
+        > Elapsed Time (from sending to calculating): 0.09577
+
+    Calculation Complete!
+        > Matrix Size: 1001 x 1001
+        > Number of Slaves: 4
+        > Elapsed Time (from sending to calculating): 0.08893
+
+Slaves: 2
+    Calculation Complete!
+        > Matrix Size: 8001 x 8001
+        > Number of Slaves: 2
+        > Elapsed Time (from sending to calculating): 8.67260
+
+    Calculation Complete!
+        > Matrix Size: 8001 x 8001
+        > Number of Slaves: 2
+        > Elapsed Time (from sending to calculating): 8.50602
+
+    Calculation Complete!
+        > Matrix Size: 8001 x 8001
+        > Number of Slaves: 2
+        > Elapsed Time (from sending to calculating): 8.46779
+
+    Calculation Complete!
+        > Matrix Size: 4001 x 4001
+        > Number of Slaves: 2
+        > Elapsed Time (from sending to calculating): 2.14390
+
+    Calculation Complete!
+        > Matrix Size: 4001 x 4001
+        > Number of Slaves: 2
+        > Elapsed Time (from sending to calculating): 2.10962
+
+    Calculation Complete!
+        > Matrix Size: 4001 x 4001
+        > Number of Slaves: 2
+        > Elapsed Time (from sending to calculating): 2.35209
+
+    Calculation Complete!
+        > Matrix Size: 1001 x 1001
+        > Number of Slaves: 2
+        > Elapsed Time (from sending to calculating): 0.12993
+
+    Calculation Complete!
+        > Matrix Size: 1001 x 1001
+        > Number of Slaves: 2
+        > Elapsed Time (from sending to calculating): 0.14069
+
+    Calculation Complete!
+        > Matrix Size: 1001 x 1001
+        > Number of Slaves: 2     
+        > Elapsed Time (from sending to calculating): 0.14462
