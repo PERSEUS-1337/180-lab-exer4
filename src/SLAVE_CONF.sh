@@ -3,8 +3,8 @@
 # Change to the 'exe' directory
 cd ./exe || exit
 
-start_port=6000
-num_slaves=16
+start_port=5050
+num_slaves=2
 matx_size=8000
 
 # Loop to create the files

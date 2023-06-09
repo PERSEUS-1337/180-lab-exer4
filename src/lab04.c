@@ -119,14 +119,14 @@ void get_host_name()
         exit(1);
     }
 
-    // printf("Current IP address: %s\n", ip_address);
+    printf("Current IP address: %s\n", ip_address);
 
     return;
 }
 
 int terrain_inter(float **matx, int row, int col)
 {
-    // printf("Calculating...\n");
+    printf("Calculating...\n");
     for (int i = 0; i < row; i++)
     {
         int min_x = getMin(i);
@@ -154,7 +154,7 @@ int terrain_inter(float **matx, int row, int col)
             }
         }
     }
-    // printf("Matrix Calculation Done!\n");
+    printf("Matrix Calculation Done!\n");
     return 0;
 }
 // SLAVE: Receive MASTER messages
@@ -173,7 +173,7 @@ int handle_client(int client_socket, bool *calculation_finished)
     }
     else if (bytesReceived1 != sizeof(int))
     {
-        // fprintf(stderr, "Incomplete read for recv_cols\n");
+        fprintf(stderr, "Incomplete read for recv_cols\n");
         // Handle the error, such as closing the socket and returning an error code
         close(client_socket);
         return 1;
@@ -189,7 +189,7 @@ int handle_client(int client_socket, bool *calculation_finished)
     }
     else if (bytesReceived2 != sizeof(int))
     {
-        // fprintf(stderr, "Incomplete read for recv_rows\n");
+        fprintf(stderr, "Incomplete read for recv_rows\n");
         // Handle the error, such as closing the socket and returning an error code
         close(client_socket);
         return 1;
@@ -233,7 +233,7 @@ int handle_client(int client_socket, bool *calculation_finished)
 
     // Send acknowledgement
     char hello[10];
-    // sprintf(hello, "ahckkkkk!");
+    sprintf(hello, "ahckkkkk!");
     send(client_socket, hello, strlen(hello), 0);
 
     printf("\nSent ack back to client!\n");
@@ -278,7 +278,7 @@ void *start_server(int port)
         exit(1);
     }
 
-    // printf("\nSlave listening on port %d\n", port);
+    printf("\nSlave listening on port %d\n", port);
 
     get_host_name();
     bool calculation_finished = false;
@@ -292,7 +292,7 @@ void *start_server(int port)
             perror("Error accepting connection");
             exit(1);
         }
-        // printf("Master connected on port %d\n", port);
+        printf("Master connected on port %d\n", port);
 
         // Handle the client connection in a separate function or thread
         handle_client(client_socket, &calculation_finished);
@@ -301,7 +301,7 @@ void *start_server(int port)
             break;
     }
 
-    // printf("\nSlave listening on port %d has been closed.\n", port);
+    printf("\nSlave listening on port %d has been closed.\n", port);
 
     // Close the server socket
     close(server_fd);
@@ -343,7 +343,7 @@ void *conn_to_server(void *arg)
     if (inet_pton(AF_INET, ip_addr, &serv_addr.sin_addr) <= 0)
     // if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0)
     {
-        // printf("\nInvalid address/ Address not supported \n");
+        printf("\nInvalid address/ Address not supported \n");
         return NULL;
     }
 
@@ -351,16 +351,16 @@ void *conn_to_server(void *arg)
     if ((status = connect(client_fd, (struct sockaddr *)&serv_addr,
                           sizeof(serv_addr))) < 0)
     {
-        // printf("\nConnection Failed \n");
+        printf("\nConnection Failed \n");
         return NULL;
     }
 
-    // printf("Connected to slave in PORT %d\n", port);
+    printf("Connected to slave in PORT %d\n", port);
 
     send(client_fd, &args->n, sizeof(int), 0);
     send(client_fd, &args->chunk, sizeof(int), 0);
 
-    // printf("Sending Matrix...\n");
+    printf("Sending Matrix...\n");
     for (int i = args->start; i < args->end; i++)
     {
         for (int j = 0; j < args->n; j++)
@@ -387,12 +387,12 @@ void *conn_to_server(void *arg)
     else if (valread == 0)
     {
         // Handle the case when the connection is closed
-        // printf("Connection closed by the Slave.\n");
+        printf("Connection closed by the Slave.\n");
         // Perform necessary cleanup or terminate the function
         return NULL;
     }
 
-    // printf("Received Message from Slave: %s\n", buffer);
+    printf("Received Message from Slave: %s\n", buffer);
 
     // destroyMatx(matx, n);
 
@@ -422,7 +422,7 @@ int main()
         scanf("%d", &port);
         start_server(port);
 
-        // printf("\nSlave mode ending.\n");
+        printf("\nSlave mode ending.\n");
     }
     else if (choice == 2)
     {
@@ -488,7 +488,7 @@ int main()
             args[i].chunk = args[i].end - args[i].start;
 
             pthread_create(&threads[i], NULL, conn_to_server, &args[i]);
-            // printf("Sent to IP and PORT: %s : %d\n", ip_address, port);
+            printf("Sent to IP and PORT: %s : %d\n", ip_address, port);
 
             // port++;
         }
@@ -507,7 +507,7 @@ int main()
     }
     else
     {
-        // printf("Invalid choice.\n");
+        printf("Invalid choice.\n");
         return 1;
     }
 
